@@ -1,0 +1,8 @@
+BasedOnStyle: Google
+IndentWidth: 4
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+    AfterClass: true
+    AfterNamespace: true
+    AfterFunction: true
