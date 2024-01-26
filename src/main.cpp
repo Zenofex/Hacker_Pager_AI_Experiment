@@ -24,6 +24,7 @@
 #include "main.h"
 #include "mesh/generated/meshtastic/config.pb.h"
 #include "modules/Modules.h"
+#include "pager/pager_main.h"
 #include "shutdown.h"
 #include "sleep.h"
 #include "target_specific.h"
@@ -896,6 +897,8 @@ void setup()
     PowerFSM_setup(); // we will transition to ON in a couple of seconds, FIXME, only do this for cold boots, not waking from SDS
     powerFSMthread = new PowerFSMThread();
     setCPUFast(false); // 80MHz is fine for our slow peripherals
+
+    pager_setup();
 }
 
 uint32_t rebootAtMsec;   // If not zero we will reboot at this time (used to reboot shortly after the update completes)
