@@ -3,13 +3,34 @@
 
 #include <functional>
 #include <memory>
-#include <vector>
+#include <stack>
 
 #include "graphics.h"
 #include "window.h"
 
+typedef U8G2_KS0108_SMR19264B_F U8G2Type;
+
 namespace pager
 {
+const int SCREEN_WIDTH = 192;
+
+/*
+// Original screen: U8G2_ST7920_128X64_F_8080
+u8g2(
+          // rotation
+          U8G2_R0,
+          // d0, d1, d2, d3, d4, d5, d6, d7
+          4, 3, 2, 38, 39, 40, 41, 42,
+          // enable/E
+          5,
+          // CS
+          U8X8_PIN_NONE,
+          // dc/RS
+          7),
+
+// New screen: U8G2_KS0108_SMR19264B_F
+
+*/
 
 class DisplayManager
 {
@@ -17,28 +38,44 @@ class DisplayManager
     explicit DisplayManager()
         : u8g2(
               // rotation
-              U8G2_R0,
+              U8G2_R2,
               // d0, d1, d2, d3, d4, d5, d6, d7
               4, 3, 2, 38, 39, 40, 41, 42,
               // enable/E
               5,
-              // CS
-              U8X8_PIN_NONE,
-              // dc/RS
-              7),
-          threadFn(std::bind(&DisplayManager::thread, this))
+              // DC/RS
+              7,
+              // CS0, CS1
+              45, 46,
+              // Reset
+              37),
+          thread_fn(std::bind(&DisplayManager::thread, this))
     {
     }
 
-    void initScreen();
+    enum Button { NONE, RED, GREEN, UP, DOWN, LEFT, RIGHT, BUTTON_LENGTH };
+
+    void init();
+
     void addWindow(int id, std::unique_ptr<Window> window);
 
    private:
     U8G2Type u8g2;
-    std::function<void()> threadFn;
+    std::function<void()> thread_fn;
     TaskHandle_t threadHandle;
-    std::vector<std::unique_ptr<pager::Window>> windows;
+    std::stack<std::unique_ptr<pager::Window>> windows;
+    std::array<bool, Button::BUTTON_LENGTH> button_state = {};
+    std::array<unsigned long, Button::BUTTON_LENGTH> button_debounce = {};
+    int queued_input = Button::NONE;
+
+    std::array<std::function<void()>, Button::BUTTON_LENGTH> interrupts;
+
     void thread();
+
+    void initScreen();
+    void initInputs();
+    void onDown(int button);
+    void onUp(int button);
 };
 
 }  // namespace pager

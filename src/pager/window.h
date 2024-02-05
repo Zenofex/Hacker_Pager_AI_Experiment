@@ -1,24 +1,24 @@
 #pragma once
 #include <U8g2lib.h>
 
-#include "graphics.h"
 namespace pager
 {
 
 class Window
 {
    public:
+    virtual void repaint(U8G2& u8g2) = 0;
+
+    virtual void onEvent(int event) = 0;
+
+    virtual void onStart() = 0;
+
+    virtual void onStop() = 0;
+
+    virtual ~Window() = default;
+
+   protected:
     explicit Window() {}
-
-    void repaint(U8G2Type& u8g2);
-
-    void onEvent(int event);
-
-    void onStart();
-
-    void onStop();
-
-   private:
 };
 
 }  // namespace pager

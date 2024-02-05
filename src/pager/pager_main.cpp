@@ -1,11 +1,10 @@
-#include "pager_main.h"
-
 #include <U8g2lib.h>
 
 #include <memory>
 
+#include "apps/launcher/launcher_window.h"
 #include "display_manager.h"
-#include "graphics.h"
+#include "pager_main.h"
 
 std::unique_ptr<pager::DisplayManager> displayManager;
 
@@ -26,10 +25,10 @@ void pager_setup()
     // Set up the LCD and UI thread.
     displayManager =
         std::unique_ptr<pager::DisplayManager>(new pager::DisplayManager());
-    displayManager->initScreen();
 
-    std::unique_ptr<pager::Window> root(new pager::Window());
+    std::unique_ptr<pager::Window> root(new pager::LauncherWindow());
     displayManager->addWindow(0, std::move(root));
+    displayManager->init();
 
     //     u8g2.begin();
     //     u8g2.setFont(u8g2_font_6x12_tf);

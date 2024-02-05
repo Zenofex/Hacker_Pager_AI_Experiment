@@ -1,0 +1,46 @@
+#include <U8g2lib.h>
+
+#include "DebugConfiguration.h"
+#include "launcher.xbm"
+#include "launcher_window.h"
+#include "pager/display_manager.h"
+
+namespace pager
+{
+
+void LauncherWindow::repaint(U8G2 &u8g2)
+{
+    u8g2.drawXBM(0, 0, launcher_width, launcher_height, launcher_bits);
+
+    int x = 10;
+    for (int i = 0; i < items.size(); i++) {
+        const auto &item = items[i];
+        const unsigned char *icon =
+            (i == selected) ? item.icon_selected : item.icon;
+        u8g2.drawXBM(x, 5, item.width, item.height, icon);
+        x += item.width + 5;
+        if (x > SCREEN_WIDTH) {
+            break;
+        }
+    }
+}
+
+void LauncherWindow::onStart() {}
+
+void LauncherWindow::onStop() {}
+
+void LauncherWindow::onEvent(int event)
+{
+    LOG_INFO("[Pager LauncherWindow] onEvent(%d)\n", event);
+    if (event == DisplayManager::Button::LEFT ||
+        event == DisplayManager::Button::RIGHT) {
+        selected += event == DisplayManager::Button::LEFT ? -1 : 1;
+        if (selected < 0) {
+            selected = items.size() - 1;
+        } else if (selected >= items.size()) {
+            selected = 0;
+        }
+    }
+}
+
+}  // namespace pager
