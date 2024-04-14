@@ -30,6 +30,18 @@ u8g2(
 
 // New screen: U8G2_KS0108_SMR19264B_F
 
+Heltec devkit:
+// d0, d1, d2, d3, d4, d5, d6, d7
+4, 3, 2, 38, 39, 40, 41, 42,
+// enable/E
+5,
+// DC/RS
+7,
+// CS0, CS1
+45, 46,
+// Reset
+37
+
 */
 
 class DisplayManager
@@ -38,17 +50,17 @@ class DisplayManager
     explicit DisplayManager()
         : u8g2(
               // rotation
-              U8G2_R2,
+              U8G2_R0,
               // d0, d1, d2, d3, d4, d5, d6, d7
-              4, 3, 2, 38, 39, 40, 41, 42,
+              4, 5, 6, 7, 15, 16, 17, 18,
               // enable/E
-              5,
+              3,
               // DC/RS
-              7,
+              42,
               // CS0, CS1
-              45, 46,
+              46, 45,
               // Reset
-              37),
+              U8X8_PIN_NONE),
           thread_fn(std::bind(&DisplayManager::thread, this))
     {
     }
@@ -67,6 +79,8 @@ class DisplayManager
     std::array<bool, Button::BUTTON_LENGTH> button_state = {};
     std::array<unsigned long, Button::BUTTON_LENGTH> button_debounce = {};
     int queued_input = Button::NONE;
+
+    unsigned long start_time = 0;
 
     std::array<std::function<void()>, Button::BUTTON_LENGTH> interrupts;
 

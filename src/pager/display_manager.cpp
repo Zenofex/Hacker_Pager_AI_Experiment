@@ -1,3 +1,5 @@
+#include "display_manager.h"
+
 #include <FunctionalInterrupt.h>
 #include <U8g2lib.h>
 
@@ -5,13 +7,15 @@
 #include <functional>
 
 #include "DebugConfiguration.h"
-#include "display_manager.h"
+#include "rick.h"
 
 namespace pager
 {
 
 constexpr BaseType_t kCpuCore = 0;
 constexpr UBaseType_t kThreadPriority = 0;
+constexpr uint32_t kContrastPin = 2;
+constexpr uint32_t kBacklightPin = 1;
 
 namespace
 {
@@ -29,7 +33,8 @@ void startThread(void *param)
 void DisplayManager::init()
 {
     LOG_INFO("[Pager DisplayManager] Start init.\n");
-    initInputs();
+    start_time = millis();
+    // initInputs();
     initScreen();
     xTaskCreatePinnedToCore(&startThread, "display_loop", 30000, &thread_fn,
                             kThreadPriority, &threadHandle, kCpuCore);
@@ -85,6 +90,14 @@ void DisplayManager::onUp(int button)
 
 void DisplayManager::initScreen()
 {
+    pinMode(kContrastPin, OUTPUT);
+    analogWrite(kContrastPin, 0);
+
+    pinMode(kBacklightPin, OUTPUT);
+    digitalWrite(kBacklightPin, HIGH);
+
+    pinMode(35, OUTPUT);
+
     u8g2.begin();
     u8g2.clearBuffer();
     u8g2.sendBuffer();
@@ -98,6 +111,7 @@ void DisplayManager::thread()
             continue;
         }
         auto &window = windows.top();
+
         // Send input events
         if (queued_input != Button::NONE) {
             window->onEvent(queued_input);
@@ -111,6 +125,35 @@ void DisplayManager::thread()
 
         // Garbage collect closed windows.
         // TODO
+
+        unsigned long now = millis();
+        unsigned long delta = now - start_time;
+        // int divider = 0, noteDuration = 0;
+        // for (int thisNote = 0; thisNote < notes * 2; thisNote = thisNote + 2)
+        // {
+        //     // calculates the duration of each note
+        //     divider = melody[thisNote + 1];
+        //     if (divider > 0) {
+        //         // regular note, just proceed
+        //         noteDuration = (wholenote) / divider;
+        //     } else if (divider < 0) {
+        //         // dotted notes are represented with negative durations!!
+        //         noteDuration = (wholenote) / abs(divider);
+        //         noteDuration *=
+        //             1.5;  // increases the duration in half for dotted notes
+        //     }
+
+        //     // we only play the note for 90% of the duration, leaving 10% as
+        //     a
+        //     // pause
+        //     tone(buzzer, melody[thisNote], noteDuration * 0.9);
+
+        //     // Wait for the specief duration before playing the next note.
+        //     delay(noteDuration);
+
+        //     // stop the waveform generation before the next note.
+        //     noTone(buzzer);
+        // }
     }
 }
 
