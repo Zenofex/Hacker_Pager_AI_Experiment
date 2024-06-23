@@ -41,6 +41,10 @@
 #include "modules/SerialModule.h"
 #endif
 #endif
+#ifdef EXPLOITEERS_PAGER
+#include "modules/exploiteers_pager/PagerModule.h"
+#endif
+
 /**
  * Create module instances here.  If you are adding a new module, you must 'new' it here (or somewhere else)
  */
@@ -118,6 +122,9 @@ void setupModules()
 #if defined(ARCH_ESP32) || defined(ARCH_NRF52) || defined(ARCH_RP2040)
         externalNotificationModule = new ExternalNotificationModule();
         new RangeTestModule();
+#endif
+#ifdef EXPLOITEERS_PAGER
+        new PagerModule();
 #endif
     } else {
         adminModule = new AdminModule();
