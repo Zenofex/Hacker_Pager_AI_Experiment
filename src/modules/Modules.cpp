@@ -188,6 +188,9 @@ void setupModules()
 #if !MESHTASTIC_EXCLUDE_RANGETEST && !MESHTASTIC_EXCLUDE_GPS
         new RangeTestModule();
 #endif
+#ifdef EXPLOITEERS_PAGER
+        new PagerModule();
+#endif
 #endif
     } else {
         adminModule = new AdminModule();
