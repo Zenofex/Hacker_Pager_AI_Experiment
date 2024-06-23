@@ -189,7 +189,8 @@ void setupModules()
         new RangeTestModule();
 #endif
 #ifdef EXPLOITEERS_PAGER
-        new PagerModule();
+        pagerModule = new PagerModule();
+        pagerModule->init();
 #endif
 #endif
     } else {
