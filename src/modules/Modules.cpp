@@ -233,7 +233,8 @@ void setupModules()
 #endif
 #endif
 #ifdef EXPLOITEERS_PAGER
-        new PagerModule();
+        pagerModule = new PagerModule();
+        pagerModule->init();
 #endif
     } else {
 #if !MESHTASTIC_EXCLUDE_ADMIN
