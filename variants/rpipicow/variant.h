@@ -8,8 +8,6 @@
 #define HAS_WIFI 1
 #endif
 
-#define USE_SH1106 1
-
 // default I2C pins:
 // SDA = 4
 // SCL = 5
@@ -21,9 +19,12 @@
 #define EXT_NOTIFY_OUT 22
 #define BUTTON_PIN 17
 
+#define LED_PIN LED_BUILTIN
+
 #define BATTERY_PIN 26
 // ratio of voltage divider = 3.0 (R17=200k, R18=100k)
 #define ADC_MULTIPLIER 3.1 // 3.0 + a bit for being optimistic
+#define BATTERY_SENSE_RESOLUTION_BITS ADC_RESOLUTION
 
 #define USE_SX1262
 

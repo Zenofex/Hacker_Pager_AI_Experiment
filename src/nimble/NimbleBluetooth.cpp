@@ -1,7 +1,9 @@
-#include "NimbleBluetooth.h"
-#include "BluetoothCommon.h"
-#include "PowerFSM.h"
 #include "configuration.h"
+#if !MESHTASTIC_EXCLUDE_BLUETOOTH
+#include "BluetoothCommon.h"
+#include "NimbleBluetooth.h"
+#include "PowerFSM.h"
+
 #include "main.h"
 #include "mesh/PhoneAPI.h"
 #include "mesh/mesh-pb-constants.h"
@@ -10,6 +12,7 @@
 
 NimBLECharacteristic *fromNumCharacteristic;
 NimBLECharacteristic *BatteryCharacteristic;
+NimBLECharacteristic *logRadioCharacteristic;
 NimBLEServer *bleServer;
 
 static bool passkeyShowing;
@@ -56,7 +59,6 @@ class NimbleBluetoothFromRadioCallback : public NimBLECharacteristicCallbacks
 {
     virtual void onRead(NimBLECharacteristic *pCharacteristic)
     {
-        LOG_INFO("From Radio onread\n");
         uint8_t fromRadioBytes[meshtastic_FromRadio_size];
         size_t numBytes = bluetoothPhoneAPI->getFromRadio(fromRadioBytes);
 
@@ -104,14 +106,26 @@ static NimbleBluetoothFromRadioCallback *fromRadioCallbacks;
 
 void NimbleBluetooth::shutdown()
 {
+    // No measurable power saving for ESP32 during light-sleep(?)
+#ifndef ARCH_ESP32
     // Shutdown bluetooth for minimum power draw
     LOG_INFO("Disable bluetooth\n");
-    // Bluefruit.Advertising.stop();
     NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
     pAdvertising->reset();
     pAdvertising->stop();
+#endif
 }
 
+// Proper shutdown for ESP32. Needs reboot to reverse.
+void NimbleBluetooth::deinit()
+{
+#ifdef ARCH_ESP32
+    LOG_INFO("Disable bluetooth until reboot\n");
+    NimBLEDevice::deinit();
+#endif
+}
+
+// Has initial setup been completed
 bool NimbleBluetooth::isActive()
 {
     return bleServer;
@@ -143,7 +157,9 @@ void NimbleBluetooth::setup()
     NimBLEDevice::setPower(ESP_PWR_LVL_P9);
 
     if (config.bluetooth.mode != meshtastic_Config_BluetoothConfig_PairingMode_NO_PIN) {
-        NimBLEDevice::setSecurityAuth(true, true, true);
+        NimBLEDevice::setSecurityAuth(BLE_SM_PAIR_AUTHREQ_BOND | BLE_SM_PAIR_AUTHREQ_MITM | BLE_SM_PAIR_AUTHREQ_SC);
+        NimBLEDevice::setSecurityInitKey(BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID);
+        NimBLEDevice::setSecurityRespKey(BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID);
         NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY);
     }
     bleServer = NimBLEDevice::createServer();
@@ -164,6 +180,7 @@ void NimbleBluetooth::setupService()
         ToRadioCharacteristic = bleService->createCharacteristic(TORADIO_UUID, NIMBLE_PROPERTY::WRITE);
         FromRadioCharacteristic = bleService->createCharacteristic(FROMRADIO_UUID, NIMBLE_PROPERTY::READ);
         fromNumCharacteristic = bleService->createCharacteristic(FROMNUM_UUID, NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::READ);
+        logRadioCharacteristic = bleService->createCharacteristic(LOGRADIO_UUID, NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::READ);
     } else {
         ToRadioCharacteristic = bleService->createCharacteristic(
             TORADIO_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_AUTHEN | NIMBLE_PROPERTY::WRITE_ENC);
@@ -172,6 +189,9 @@ void NimbleBluetooth::setupService()
         fromNumCharacteristic =
             bleService->createCharacteristic(FROMNUM_UUID, NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::READ |
                                                                NIMBLE_PROPERTY::READ_AUTHEN | NIMBLE_PROPERTY::READ_ENC);
+        logRadioCharacteristic =
+            bleService->createCharacteristic(LOGRADIO_UUID, NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::READ |
+                                                                NIMBLE_PROPERTY::READ_AUTHEN | NIMBLE_PROPERTY::READ_ENC);
     }
     bluetoothPhoneAPI = new BluetoothPhoneAPI();
 
@@ -220,6 +240,14 @@ void NimbleBluetooth::clearBonds()
     NimBLEDevice::deleteAllBonds();
 }
 
+void NimbleBluetooth::sendLog(const char *logMessage)
+{
+    if (!bleServer || !isConnected() || strlen(logMessage) > 512) {
+        return;
+    }
+    logRadioCharacteristic->notify(reinterpret_cast<const uint8_t *>(logMessage), strlen(logMessage));
+}
+
 void clearNVS()
 {
     NimBLEDevice::deleteAllBonds();
@@ -227,3 +255,4 @@ void clearNVS()
     ESP.restart();
 #endif
 }
+#endif

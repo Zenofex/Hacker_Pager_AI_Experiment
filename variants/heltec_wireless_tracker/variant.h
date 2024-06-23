@@ -1,5 +1,11 @@
 #define LED_PIN 18
 
+#define HELTEC_TRACKER_V1_X
+
+// I2C
+#define I2C_SDA SDA
+#define I2C_SCL SCL
+
 // ST7735S TFT LCD
 #define ST7735S 1 // there are different (sub-)versions of ST7735
 #define ST7735_CS 38
@@ -9,32 +15,31 @@
 #define ST7735_RESET 39
 #define ST7735_MISO -1
 #define ST7735_BUSY -1
-#define ST7735_BL_V03 45
 #define ST7735_BL_V05 21 /* V1.1 PCB marking */
 #define ST7735_SPI_HOST SPI3_HOST
-#define ST7735_BACKLIGHT_EN_V03 45
-#define ST7735_BACKLIGHT_EN_V05 21
 #define SPI_FREQUENCY 40000000
 #define SPI_READ_FREQUENCY 16000000
 #define SCREEN_ROTATE
-#define TFT_HEIGHT 160
-#define TFT_WIDTH 80
+#define TFT_HEIGHT DISPLAY_WIDTH
+#define TFT_WIDTH DISPLAY_HEIGHT
 #define TFT_OFFSET_X 26
-#define TFT_OFFSET_Y 0
-#define VTFT_CTRL_V03 46 // Heltec Tracker needs this pulled low for TFT
-#define VTFT_CTRL_V05 -1
-#define SCREEN_TRANSITION_FRAMERATE 1 // fps
+#define TFT_OFFSET_Y -1
+#define SCREEN_TRANSITION_FRAMERATE 3 // fps
 #define DISPLAY_FORCE_SMALL_FONTS
 
-#define VEXT_ENABLE_V03 Vext // active low, powers the oled display and the lora antenna boost
-#define VEXT_ENABLE_V05 3    // active HIGH, powers the oled display
+// pin 3 is Vext on v1.1 - HIGH enables LDO for Vext rail which goes to:
+// GPS UC6580:          GPS V_DET(8), VDD_IO(7), DCDC_IN(21), pulls up RESETN(17), D_SEL(33) and BOOT_MODE(34) through 10kR
+// GPS LNA SW7125DE:    VCC(4), pulls up SHDN(5) through 10kR
+// LED:                 VDD, LEDA (through diode)
+#define VEXT_ENABLE_V05 3 // active HIGH - powers the GPS, GPS LNA and OLED VDD/anode
 #define BUTTON_PIN 0
 
 #define BATTERY_PIN 1 // A battery voltage measurement pin, voltage divider connected here to measure battery voltage
 #define ADC_CHANNEL ADC1_GPIO1_CHANNEL
 #define ADC_ATTENUATION ADC_ATTEN_DB_2_5 // lower dB for high resistance voltage divider
-#define ADC_MULTIPLIER 4.9
+#define ADC_MULTIPLIER 4.9 * 1.045
 #define ADC_CTRL 2 // active HIGH, powers the voltage divider. Only on 1.1
+#define ADC_CTRL_ENABLED HIGH
 
 #undef GPS_RX_PIN
 #undef GPS_TX_PIN
@@ -42,11 +47,8 @@
 #define GPS_TX_PIN 34
 #define PIN_GPS_RESET 35
 #define PIN_GPS_PPS 36
-
-#define VGNSS_CTRL_V03 37 // Heltec Tracker needs this pulled low for GPS
-#define VGNSS_CTRL_V05 -1 // Heltec Tracker needs this pulled low for GPS
-#define PIN_GPS_EN VGNSS_CTRL_V03
-#define GPS_EN_ACTIVE LOW
+// #define PIN_GPS_EN 3    // Uncomment to power off the GPS with triple-click on Tracker v1.1, though we'll also lose the
+// display.
 
 #define GPS_RESET_MODE LOW
 #define GPS_UC6580

@@ -1,4 +1,7 @@
+#include "configuration.h"
+#if !MESHTASTIC_EXCLUDE_GPS
 #include "GPS.h"
+#endif
 #include "MeshRadio.h"
 #include "MeshService.h"
 #include "NodeDB.h"
@@ -6,7 +9,7 @@
 #include "ReliableRouter.h"
 #include "airtime.h"
 #include "buzz.h"
-#include "configuration.h"
+
 #include "error.h"
 #include "power.h"
 // #include "debug.h"
@@ -33,14 +36,18 @@
 // #include <driver/rtc_io.h>
 
 #ifdef ARCH_ESP32
+#if !MESHTASTIC_EXCLUDE_WEBSERVER
 #include "mesh/http/WebServer.h"
+#endif
+#if !MESHTASTIC_EXCLUDE_BLUETOOTH
 #include "nimble/NimbleBluetooth.h"
-NimbleBluetooth *nimbleBluetooth;
+NimbleBluetooth *nimbleBluetooth = nullptr;
+#endif
 #endif
 
 #ifdef ARCH_NRF52
 #include "NRF52Bluetooth.h"
-NRF52Bluetooth *nrf52Bluetooth;
+NRF52Bluetooth *nrf52Bluetooth = nullptr;
 #endif
 
 #if HAS_WIFI
@@ -52,47 +59,58 @@ NRF52Bluetooth *nrf52Bluetooth;
 #include "mesh/api/ethServerAPI.h"
 #include "mesh/eth/ethClient.h"
 #endif
+
+#if !MESHTASTIC_EXCLUDE_MQTT
 #include "mqtt/MQTT.h"
+#endif
 
 #include "LLCC68Interface.h"
+#include "LR1110Interface.h"
+#include "LR1120Interface.h"
 #include "RF95Interface.h"
 #include "SX1262Interface.h"
 #include "SX1268Interface.h"
 #include "SX1280Interface.h"
+#include "detect/LoRaRadioType.h"
+
 #ifdef ARCH_STM32WL
 #include "STM32WLE5JCInterface.h"
 #endif
+
 #if !HAS_RADIO && defined(ARCH_PORTDUINO)
 #include "platform/portduino/SimRadio.h"
 #endif
 
-#ifdef ARCH_RASPBERRY_PI
+#ifdef ARCH_PORTDUINO
 #include "linux/LinuxHardwareI2C.h"
+#include "mesh/raspihttp/PiWebServer.h"
 #include "platform/portduino/PortduinoGlue.h"
 #include <fstream>
 #include <iostream>
 #include <string>
 #endif
 
-#if HAS_BUTTON || defined(ARCH_RASPBERRY_PI)
+#if HAS_BUTTON || defined(ARCH_PORTDUINO)
 #include "ButtonThread.h"
 #endif
+
+#include "AmbientLightingThread.h"
 #include "PowerFSMThread.h"
 
-#if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL)
+#if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL) && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
 #include "AccelerometerThread.h"
-#include "AmbientLightingThread.h"
+AccelerometerThread *accelerometerThread = nullptr;
 #endif
 
 #ifdef HAS_I2S
 #include "AudioThread.h"
-AudioThread *audioThread;
+AudioThread *audioThread = nullptr;
 #endif
 
 using namespace concurrency;
 
 // We always create a screen object, but we only init it if we find the hardware
-graphics::Screen *screen;
+graphics::Screen *screen = nullptr;
 
 // Global power status
 meshtastic::PowerStatus *powerStatus = new meshtastic::PowerStatus();
@@ -128,11 +146,15 @@ ATECCX08A atecc;
 Adafruit_DRV2605 drv;
 #endif
 
+// Global LoRa radio type
+LoRaRadioType radioType = NO_RADIO;
+
 bool isVibrating = false;
 
 bool eink_found = true;
 
 uint32_t serialSinceMsec;
+bool pauseBluetoothLogging = false;
 
 bool pmu_found;
 
@@ -141,37 +163,17 @@ std::pair<uint8_t, TwoWire *> nodeTelemetrySensorsMap[_meshtastic_TelemetrySenso
 
 Router *router = NULL; // Users of router don't care what sort of subclass implements that API
 
-#ifdef ARCH_RASPBERRY_PI
-void getPiMacAddr(uint8_t *dmac)
-{
-    std::fstream macIdentity;
-    macIdentity.open("/sys/kernel/debug/bluetooth/hci0/identity", std::ios::in);
-    std::string macLine;
-    getline(macIdentity, macLine);
-    macIdentity.close();
-
-    dmac[0] = strtol(macLine.substr(0, 2).c_str(), NULL, 16);
-    dmac[1] = strtol(macLine.substr(3, 2).c_str(), NULL, 16);
-    dmac[2] = strtol(macLine.substr(6, 2).c_str(), NULL, 16);
-    dmac[3] = strtol(macLine.substr(9, 2).c_str(), NULL, 16);
-    dmac[4] = strtol(macLine.substr(12, 2).c_str(), NULL, 16);
-    dmac[5] = strtol(macLine.substr(15, 2).c_str(), NULL, 16);
-}
-#endif
-
 const char *getDeviceName()
 {
     uint8_t dmac[6];
-#ifdef ARCH_RASPBERRY_PI
-    getPiMacAddr(dmac);
-#else
+
     getMacAddr(dmac);
-#endif
+
     // Meshtastic_ab3c or Shortname_abcd
     static char name[20];
     snprintf(name, sizeof(name), "%02x%02x", dmac[4], dmac[5]);
     // if the shortname exists and is NOT the new default of ab3c, use it for BLE name.
-    if ((owner.short_name != NULL) && (strcmp(owner.short_name, name) != 0)) {
+    if (strcmp(owner.short_name, name) != 0) {
         snprintf(name, sizeof(name), "%s_%02x%02x", owner.short_name, dmac[4], dmac[5]);
     } else {
         snprintf(name, sizeof(name), "Meshtastic_%02x%02x", dmac[4], dmac[5]);
@@ -179,27 +181,13 @@ const char *getDeviceName()
     return name;
 }
 
-#ifdef VEXT_ENABLE_V03
-
-#include <soc/rtc.h>
-
-static uint32_t calibrate_one(rtc_cal_sel_t cal_clk, const char *name)
-{
-    const uint32_t cal_count = 1000;
-    uint32_t cali_val;
-    for (int i = 0; i < 5; ++i) {
-        cali_val = rtc_clk_cal(cal_clk, cal_count);
-    }
-    return cali_val;
-}
-
-int heltec_version = 3;
-
-#define CALIBRATE_ONE(cali_clk) calibrate_one(cali_clk, #cali_clk)
-#endif
-
 static int32_t ledBlinker()
 {
+    // Still set up the blinking (heartbeat) interval but skip code path below, so LED will blink if
+    // config.device.led_heartbeat_disabled is changed
+    if (config.device.led_heartbeat_disabled)
+        return 1000;
+
     static bool ledOn;
     ledOn ^= 1;
 
@@ -211,17 +199,8 @@ static int32_t ledBlinker()
 
 uint32_t timeLastPowered = 0;
 
-#if HAS_BUTTON || defined(ARCH_RASPBERRY_PI)
-bool ButtonThread::shutdown_on_long_stop = false;
-#endif
-
 static Periodic *ledPeriodic;
 static OSThread *powerFSMthread;
-#if HAS_BUTTON || defined(ARCH_RASPBERRY_PI)
-static OSThread *buttonThread;
-uint32_t ButtonThread::longPressTime = 0;
-#endif
-static OSThread *accelerometerThread;
 static OSThread *ambientLightingThread;
 SPISettings spiSettings(4000000, MSBFIRST, SPI_MODE0);
 
@@ -262,62 +241,43 @@ void setup()
 
     initDeepSleep();
 
-    // Testing this fix für erratic T-Echo boot behaviour
-#if defined(TTGO_T_ECHO) && defined(PIN_EINK_PWR_ON)
-    pinMode(PIN_EINK_PWR_ON, OUTPUT);
-    digitalWrite(PIN_EINK_PWR_ON, HIGH);
+    // power on peripherals
+#if defined(PIN_POWER_EN)
+    pinMode(PIN_POWER_EN, OUTPUT);
+    digitalWrite(PIN_POWER_EN, HIGH);
+    // digitalWrite(PIN_POWER_EN1, INPUT);
 #endif
 
-#ifdef ST7735_BL_V03 // Heltec Wireless Tracker PCB Change Detect/Hack
-
-    rtc_clk_32k_enable(true);
-    CALIBRATE_ONE(RTC_CAL_RTC_MUX);
-    if (CALIBRATE_ONE(RTC_CAL_32K_XTAL) != 0) {
-        rtc_clk_slow_freq_set(RTC_SLOW_FREQ_32K_XTAL);
-        CALIBRATE_ONE(RTC_CAL_RTC_MUX);
-        CALIBRATE_ONE(RTC_CAL_32K_XTAL);
-    }
-
-    if (rtc_clk_slow_freq_get() != RTC_SLOW_FREQ_32K_XTAL) {
-        heltec_version = 3;
-    } else {
-        heltec_version = 5;
-    }
+#if defined(LORA_TCXO_GPIO)
+    pinMode(LORA_TCXO_GPIO, OUTPUT);
+    digitalWrite(LORA_TCXO_GPIO, HIGH);
 #endif
 
 #if defined(VEXT_ENABLE_V03)
-    if (heltec_version == 3) {
-        pinMode(VEXT_ENABLE_V03, OUTPUT);
-        digitalWrite(VEXT_ENABLE_V03, 0); // turn on the display power
-        LOG_DEBUG("HELTEC Detect Tracker V1.0\n");
-    } else {
-        pinMode(VEXT_ENABLE_V05, OUTPUT);
-        digitalWrite(VEXT_ENABLE_V05, 1); // turn on the display power
-        LOG_DEBUG("HELTEC Detect Tracker V1.1\n");
-    }
+    pinMode(VEXT_ENABLE_V03, OUTPUT);
+    pinMode(ST7735_BL_V03, OUTPUT);
+    digitalWrite(VEXT_ENABLE_V03, 0); // turn on the display power and antenna boost
+    digitalWrite(ST7735_BL_V03, 1);   // display backligth on
+    LOG_DEBUG("HELTEC Detect Tracker V1.0\n");
+#elif defined(VEXT_ENABLE_V05)
+    pinMode(VEXT_ENABLE_V05, OUTPUT);
+    pinMode(ST7735_BL_V05, OUTPUT);
+    digitalWrite(VEXT_ENABLE_V05, 1); // turn on the lora antenna boost
+    digitalWrite(ST7735_BL_V05, 1);   // turn on display backligth
+    LOG_DEBUG("HELTEC Detect Tracker V1.1\n");
 #elif defined(VEXT_ENABLE)
     pinMode(VEXT_ENABLE, OUTPUT);
     digitalWrite(VEXT_ENABLE, 0); // turn on the display power
 #endif
 
 #if defined(VGNSS_CTRL_V03)
-    if (heltec_version == 3) {
-        pinMode(VGNSS_CTRL_V03, OUTPUT);
-        digitalWrite(VGNSS_CTRL_V03, LOW);
-    } else {
-        pinMode(VGNSS_CTRL_V05, OUTPUT);
-        digitalWrite(VGNSS_CTRL_V05, LOW);
-    }
+    pinMode(VGNSS_CTRL_V03, OUTPUT);
+    digitalWrite(VGNSS_CTRL_V03, LOW);
 #endif
 
 #if defined(VTFT_CTRL_V03)
-    if (heltec_version == 3) {
-        pinMode(VTFT_CTRL_V03, OUTPUT);
-        digitalWrite(VTFT_CTRL_V03, LOW);
-    } else {
-        pinMode(VTFT_CTRL_V05, OUTPUT);
-        digitalWrite(VTFT_CTRL_V05, LOW);
-    }
+    pinMode(VTFT_CTRL_V03, OUTPUT);
+    digitalWrite(VTFT_CTRL_V03, LOW);
 #endif
 
 #if defined(VGNSS_CTRL)
@@ -369,12 +329,27 @@ void setup()
 
 #endif
 
-#ifdef I2C_SDA1
+#if defined(I2C_SDA1) && defined(ARCH_RP2040)
+    Wire1.setSDA(I2C_SDA1);
+    Wire1.setSCL(I2C_SCL1);
+    Wire1.begin();
+#elif defined(I2C_SDA1) && !defined(ARCH_RP2040)
     Wire1.begin(I2C_SDA1, I2C_SCL1);
 #endif
 
-#ifdef I2C_SDA
+#if defined(I2C_SDA) && defined(ARCH_RP2040)
+    Wire.setSDA(I2C_SDA);
+    Wire.setSCL(I2C_SCL);
+    Wire.begin();
+#elif defined(I2C_SDA) && !defined(ARCH_RP2040)
     Wire.begin(I2C_SDA, I2C_SCL);
+#elif defined(ARCH_PORTDUINO)
+    if (settingsStrings[i2cdev] != "") {
+        LOG_INFO("Using %s as I2C device.\n", settingsStrings[i2cdev].c_str());
+        Wire.begin(settingsStrings[i2cdev].c_str());
+    } else {
+        LOG_INFO("No I2C device configured, skipping.\n");
+    }
 #elif HAS_WIRE
     Wire.begin();
 #endif
@@ -388,17 +363,10 @@ void setup()
     delay(1);
 #endif
 
-#ifdef RAK4630
-#ifdef PIN_3V3_EN
-    // We need to enable 3.3V periphery in order to scan it
-    pinMode(PIN_3V3_EN, OUTPUT);
-    digitalWrite(PIN_3V3_EN, HIGH);
-#endif
-#ifndef USE_EINK
+#ifdef AQ_SET_PIN
     // RAK-12039 set pin for Air quality sensor
     pinMode(AQ_SET_PIN, OUTPUT);
     digitalWrite(AQ_SET_PIN, HIGH);
-#endif
 #endif
 
 #ifdef T_DECK
@@ -420,17 +388,33 @@ void setup()
     // We need to scan here to decide if we have a screen for nodeDB.init() and because power has been applied to
     // accessories
     auto i2cScanner = std::unique_ptr<ScanI2CTwoWire>(new ScanI2CTwoWire());
-
+#if HAS_WIRE
     LOG_INFO("Scanning for i2c devices...\n");
+#endif
 
-#ifdef I2C_SDA1
+#if defined(I2C_SDA1) && defined(ARCH_RP2040)
+    Wire1.setSDA(I2C_SDA1);
+    Wire1.setSCL(I2C_SCL1);
+    Wire1.begin();
+    i2cScanner->scanPort(ScanI2C::I2CPort::WIRE1);
+#elif defined(I2C_SDA1) && !defined(ARCH_RP2040)
     Wire1.begin(I2C_SDA1, I2C_SCL1);
     i2cScanner->scanPort(ScanI2C::I2CPort::WIRE1);
 #endif
 
-#ifdef I2C_SDA
+#if defined(I2C_SDA) && defined(ARCH_RP2040)
+    Wire.setSDA(I2C_SDA);
+    Wire.setSCL(I2C_SCL);
+    Wire.begin();
+    i2cScanner->scanPort(ScanI2C::I2CPort::WIRE);
+#elif defined(I2C_SDA) && !defined(ARCH_RP2040)
     Wire.begin(I2C_SDA, I2C_SCL);
     i2cScanner->scanPort(ScanI2C::I2CPort::WIRE);
+#elif defined(ARCH_PORTDUINO)
+    if (settingsStrings[i2cdev] != "") {
+        LOG_INFO("Scanning for i2c devices...\n");
+        i2cScanner->scanPort(ScanI2C::I2CPort::WIRE);
+    }
 #elif HAS_WIRE
     i2cScanner->scanPort(ScanI2C::I2CPort::WIRE);
 #endif
@@ -438,10 +422,6 @@ void setup()
     auto i2cCount = i2cScanner->countDevices();
     if (i2cCount == 0) {
         LOG_INFO("No I2C devices found\n");
-        Wire.end();
-#ifdef I2C_SDA1
-        Wire1.end();
-#endif
     } else {
         LOG_INFO("%i I2C devices found\n", i2cCount);
     }
@@ -537,6 +517,7 @@ void setup()
     SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::BME_680, meshtastic_TelemetrySensorType_BME680)
     SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::BME_280, meshtastic_TelemetrySensorType_BME280)
     SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::BMP_280, meshtastic_TelemetrySensorType_BMP280)
+    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::BMP_085, meshtastic_TelemetrySensorType_BMP085)
     SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::INA260, meshtastic_TelemetrySensorType_INA260)
     SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::INA219, meshtastic_TelemetrySensorType_INA219)
     SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::INA3221, meshtastic_TelemetrySensorType_INA3221)
@@ -549,15 +530,19 @@ void setup()
     SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::QMI8658, meshtastic_TelemetrySensorType_QMI8658)
     SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::QMC5883L, meshtastic_TelemetrySensorType_QMC5883L)
     SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::PMSA0031, meshtastic_TelemetrySensorType_PMSA003I)
+    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::RCWL9620, meshtastic_TelemetrySensorType_RCWL9620)
+    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::VEML7700, meshtastic_TelemetrySensorType_VEML7700)
+    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::TSL2591, meshtastic_TelemetrySensorType_TSL25911FN)
+    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::OPT3001, meshtastic_TelemetrySensorType_OPT3001)
+    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::MLX90632, meshtastic_TelemetrySensorType_MLX90632)
+    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::SHT4X, meshtastic_TelemetrySensorType_SHT4X)
+    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::AHT10, meshtastic_TelemetrySensorType_AHT10)
+    SCANNER_TO_SENSORS_MAP(ScanI2C::DeviceType::DFROBOT_LARK, meshtastic_TelemetrySensorType_DFROBOT_LARK)
 
     i2cScanner.reset();
 
 #ifdef HAS_SDCARD
     setupSDCard();
-#endif
-
-#ifdef RAK4630
-    // scanEInkDevice();
 #endif
 
     // LED init
@@ -584,7 +569,7 @@ void setup()
 
     // We do this as early as possible because this loads preferences from flash
     // but we need to do this after main cpu init (esp32setup), because we need the random seed set
-    nodeDB.init();
+    nodeDB = new NodeDB;
 
     // If we're taking on the repeater role, use flood router and turn off 3V3_S rail because peripherals are not needed
     if (config.device.role == meshtastic_Config_DeviceConfig_Role_REPEATER) {
@@ -595,7 +580,7 @@ void setup()
     } else
         router = new ReliableRouter();
 
-#if HAS_BUTTON || defined(ARCH_RASPBERRY_PI)
+#if HAS_BUTTON || defined(ARCH_PORTDUINO)
     // Buttons. Moved here cause we need NodeDB to be initialized
     buttonThread = new ButtonThread();
 #endif
@@ -615,7 +600,7 @@ void setup()
     screen_model = meshtastic_Config_DisplayConfig_OledType_OLED_SH1107; // keep dimension of 128x64
 #endif
 
-#if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL)
+#if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL) && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
     if (acc_info.type != ScanI2C::DeviceType::NONE) {
         config.display.wake_on_tap_or_motion = true;
         moduleConfig.external_notification.enabled = true;
@@ -623,7 +608,9 @@ void setup()
     }
 #endif
 
-#if !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL)
+#if defined(HAS_NEOPIXEL) || defined(UNPHONE) || defined(RGBLED_RED)
+    ambientLightingThread = new AmbientLightingThread(ScanI2C::DeviceType::NONE);
+#elif !defined(ARCH_PORTDUINO) && !defined(ARCH_STM32WL)
     if (rgb_found.type != ScanI2C::DeviceType::NONE) {
         ambientLightingThread = new AmbientLightingThread(rgb_found.type);
     }
@@ -657,25 +644,40 @@ void setup()
 #else
     // ESP32
     SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
-    LOG_WARN("SPI.begin(SCK=%d, MISO=%d, MOSI=%d, NSS=%d)\n", LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
+    LOG_DEBUG("SPI.begin(SCK=%d, MISO=%d, MOSI=%d, NSS=%d)\n", LORA_SCK, LORA_MISO, LORA_MOSI, LORA_CS);
     SPI.setFrequency(4000000);
 #endif
 
     // Initialize the screen first so we can show the logo while we start up everything else.
     screen = new graphics::Screen(screen_found, screen_model, screen_geometry);
 
+    // setup TZ prior to time actions.
+    if (*config.device.tzdef) {
+        setenv("TZ", config.device.tzdef, 1);
+    } else {
+        setenv("TZ", "GMT0", 1);
+    }
+    tzset();
+    LOG_DEBUG("Set Timezone to %s\n", getenv("TZ"));
+
     readFromRTC(); // read the main CPU RTC at first (in case we can't get GPS time)
 
+#if !MESHTASTIC_EXCLUDE_GPS
     // If we're taking on the repeater role, ignore GPS
-    if (config.device.role != meshtastic_Config_DeviceConfig_Role_REPEATER) {
-        gps = GPS::createGps();
+    if (HAS_GPS) {
+        if (config.device.role != meshtastic_Config_DeviceConfig_Role_REPEATER &&
+            config.position.gps_mode != meshtastic_Config_PositionConfig_GpsMode_NOT_PRESENT) {
+            gps = GPS::createGps();
+            if (gps) {
+                gpsStatus->observe(&gps->newStatus);
+            } else {
+                LOG_DEBUG("Running without GPS.\n");
+            }
+        }
     }
-    if (gps) {
-        gpsStatus->observe(&gps->newStatus);
-    } else {
-        LOG_DEBUG("Running without GPS.\n");
-    }
-    nodeStatus->observe(&nodeDB.newStatus);
+#endif
+
+    nodeStatus->observe(&nodeDB->newStatus);
 
 #ifdef HAS_I2S
     LOG_DEBUG("Starting audio thread\n");
@@ -687,6 +689,12 @@ void setup()
     // Now that the mesh service is created, create any modules
     setupModules();
 
+#ifdef LED_PIN
+    // Turn LED off after boot, if heartbeat by config
+    if (config.device.led_heartbeat_disabled)
+        digitalWrite(LED_PIN, LOW ^ LED_INVERTED);
+#endif
+
 // Do this after service.init (because that clears error_code)
 #ifdef HAS_PMU
     if (!pmu_found)
@@ -695,9 +703,9 @@ void setup()
 
 // Don't call screen setup until after nodedb is setup (because we need
 // the current region name)
-#if defined(ST7735_CS) || defined(USE_EINK) || defined(ILI9341_DRIVER) || defined(ST7789_CS)
+#if defined(ST7735_CS) || defined(USE_EINK) || defined(ILI9341_DRIVER) || defined(ST7789_CS) || defined(HX8357_CS)
     screen->setup();
-#elif ARCH_RASPBERRY_PI
+#elif defined(ARCH_PORTDUINO)
     if (screen_found.port != ScanI2C::I2CPort::NO_I2C || settingsMap[displayPanel]) {
         screen->setup();
     }
@@ -714,10 +722,17 @@ void setup()
     digitalWrite(SX126X_ANT_SW, 1);
 #endif
 
-#ifdef ARCH_RASPBERRY_PI
+#ifdef PIN_PWR_DELAY_MS
+    // This may be required to give the peripherals time to power up.
+    delay(PIN_PWR_DELAY_MS);
+#endif
+
+#ifdef ARCH_PORTDUINO
     if (settingsMap[use_sx1262]) {
         if (!rIf) {
-            LockingArduinoHal *RadioLibHAL = new LockingArduinoHal(SPI, spiSettings);
+            LOG_DEBUG("Attempting to activate sx1262 radio on SPI port %s\n", settingsStrings[spidev].c_str());
+            LockingArduinoHal *RadioLibHAL =
+                new LockingArduinoHal(SPI, spiSettings, (settingsMap[ch341Quirk] ? settingsMap[busy] : RADIOLIB_NC));
             rIf = new SX1262Interface((LockingArduinoHal *)RadioLibHAL, settingsMap[cs], settingsMap[irq], settingsMap[reset],
                                       settingsMap[busy]);
             if (!rIf->init()) {
@@ -730,7 +745,9 @@ void setup()
         }
     } else if (settingsMap[use_rf95]) {
         if (!rIf) {
-            LockingArduinoHal *RadioLibHAL = new LockingArduinoHal(SPI, spiSettings);
+            LOG_DEBUG("Attempting to activate rf95 radio on SPI port %s\n", settingsStrings[spidev].c_str());
+            LockingArduinoHal *RadioLibHAL =
+                new LockingArduinoHal(SPI, spiSettings, (settingsMap[ch341Quirk] ? settingsMap[busy] : RADIOLIB_NC));
             rIf = new RF95Interface((LockingArduinoHal *)RadioLibHAL, settingsMap[cs], settingsMap[irq], settingsMap[reset],
                                     settingsMap[busy]);
             if (!rIf->init()) {
@@ -740,6 +757,36 @@ void setup()
                 exit(EXIT_FAILURE);
             } else {
                 LOG_INFO("RF95 Radio init succeeded, using RF95 radio\n");
+            }
+        }
+    } else if (settingsMap[use_sx1280]) {
+        if (!rIf) {
+            LOG_DEBUG("Attempting to activate sx1280 radio on SPI port %s\n", settingsStrings[spidev].c_str());
+            LockingArduinoHal *RadioLibHAL = new LockingArduinoHal(SPI, spiSettings);
+            rIf = new SX1280Interface((LockingArduinoHal *)RadioLibHAL, settingsMap[cs], settingsMap[irq], settingsMap[reset],
+                                      settingsMap[busy]);
+            if (!rIf->init()) {
+                LOG_ERROR("Failed to find SX1280 radio\n");
+                delete rIf;
+                rIf = NULL;
+                exit(EXIT_FAILURE);
+            } else {
+                LOG_INFO("SX1280 Radio init succeeded, using SX1280 radio\n");
+            }
+        }
+    } else if (settingsMap[use_sx1268]) {
+        if (!rIf) {
+            LOG_DEBUG("Attempting to activate sx1268 radio on SPI port %s\n", settingsStrings[spidev].c_str());
+            LockingArduinoHal *RadioLibHAL = new LockingArduinoHal(SPI, spiSettings);
+            rIf = new SX1268Interface((LockingArduinoHal *)RadioLibHAL, settingsMap[cs], settingsMap[irq], settingsMap[reset],
+                                      settingsMap[busy]);
+            if (!rIf->init()) {
+                LOG_ERROR("Failed to find SX1268 radio\n");
+                delete rIf;
+                rIf = NULL;
+                exit(EXIT_FAILURE);
+            } else {
+                LOG_INFO("SX1268 Radio init succeeded, using SX1268 radio\n");
             }
         }
     }
@@ -760,6 +807,7 @@ void setup()
             rIf = NULL;
         } else {
             LOG_INFO("STM32WL Radio init succeeded, using STM32WL radio\n");
+            radioType = STM32WLx_RADIO;
         }
     }
 #endif
@@ -773,6 +821,7 @@ void setup()
             rIf = NULL;
         } else {
             LOG_INFO("Using SIMULATED radio!\n");
+            radioType = SIM_RADIO;
         }
     }
 #endif
@@ -786,11 +835,12 @@ void setup()
             rIf = NULL;
         } else {
             LOG_INFO("RF95 Radio init succeeded, using RF95 radio\n");
+            radioType = RF95_RADIO;
         }
     }
 #endif
 
-#if defined(USE_SX1262) && !defined(ARCH_RASPBERRY_PI)
+#if defined(USE_SX1262) && !defined(ARCH_PORTDUINO)
     if (!rIf) {
         rIf = new SX1262Interface(RadioLibHAL, SX126X_CS, SX126X_DIO1, SX126X_RESET, SX126X_BUSY);
         if (!rIf->init()) {
@@ -799,6 +849,7 @@ void setup()
             rIf = NULL;
         } else {
             LOG_INFO("SX1262 Radio init succeeded, using SX1262 radio\n");
+            radioType = SX1262_RADIO;
         }
     }
 #endif
@@ -812,6 +863,7 @@ void setup()
             rIf = NULL;
         } else {
             LOG_INFO("SX1268 Radio init succeeded, using SX1268 radio\n");
+            radioType = SX1268_RADIO;
         }
     }
 #endif
@@ -825,6 +877,33 @@ void setup()
             rIf = NULL;
         } else {
             LOG_INFO("LLCC68 Radio init succeeded, using LLCC68 radio\n");
+            radioType = LLCC68_RADIO;
+        }
+    }
+#endif
+
+#if defined(USE_LR1110)
+    if (!rIf) {
+        rIf = new LR1110Interface(RadioLibHAL, LR1110_SPI_NSS_PIN, LR1110_IRQ_PIN, LR1110_NRESER_PIN, LR1110_BUSY_PIN);
+        if (!rIf->init()) {
+            LOG_WARN("Failed to find LR1110 radio\n");
+            delete rIf;
+            rIf = NULL;
+        } else {
+            LOG_INFO("LR1110 Radio init succeeded, using LR1110 radio\n");
+        }
+    }
+#endif
+
+#if defined(USE_LR1120)
+    if (!rIf) {
+        rIf = new LR1120Interface(RadioLibHAL, LR1120_SPI_NSS_PIN, LR1120_IRQ_PIN, LR1120_NRESER_PIN, LR1120_BUSY_PIN);
+        if (!rIf->init()) {
+            LOG_WARN("Failed to find LR1120 radio\n");
+            delete rIf;
+            rIf = NULL;
+        } else {
+            LOG_INFO("LR1120 Radio init succeeded, using LR1120 radio\n");
         }
     }
 #endif
@@ -838,6 +917,7 @@ void setup()
             rIf = NULL;
         } else {
             LOG_INFO("SX1280 Radio init succeeded, using SX1280 radio\n");
+            radioType = SX1280_RADIO;
         }
     }
 #endif
@@ -847,7 +927,7 @@ void setup()
     if ((config.lora.region == meshtastic_Config_LoRaConfig_RegionCode_LORA_24) && (!rIf->wideLora())) {
         LOG_WARN("Radio chip does not support 2.4GHz LoRa. Reverting to unset.\n");
         config.lora.region = meshtastic_Config_LoRaConfig_RegionCode_UNSET;
-        nodeDB.saveToDisk(SEGMENT_CONFIG);
+        nodeDB->saveToDisk(SEGMENT_CONFIG);
         if (!rIf->reconfigure()) {
             LOG_WARN("Reconfigure failed, rebooting\n");
             screen->startRebootScreen();
@@ -855,9 +935,12 @@ void setup()
         }
     }
 
+#if !MESHTASTIC_EXCLUDE_MQTT
     mqttInit();
+#endif
 
 #ifndef ARCH_PORTDUINO
+
     // Initialize Wifi
 #if HAS_WIFI
     initWifi();
@@ -869,12 +952,17 @@ void setup()
 #endif
 #endif
 
-#ifdef ARCH_ESP32
+#if defined(ARCH_ESP32) && !MESHTASTIC_EXCLUDE_WEBSERVER
     // Start web server thread.
     webServerThread = new WebServerThread();
 #endif
 
 #ifdef ARCH_PORTDUINO
+#if __has_include(<ulfius.h>)
+    if (settingsMap[webserverport] != -1) {
+        piwebServerThread = new PiWebServerThread();
+    }
+#endif
     initApiServer(TCPPort);
 #endif
 

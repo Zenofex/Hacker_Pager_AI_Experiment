@@ -4,7 +4,7 @@
 #include "configuration.h"
 #include "modules/ExternalNotificationModule.h"
 
-#ifdef ARCH_RASPBERRY_PI
+#if ARCH_PORTDUINO
 #include "platform/portduino/PortduinoGlue.h"
 #endif
 
@@ -17,7 +17,7 @@ TouchScreenImpl1::TouchScreenImpl1(uint16_t width, uint16_t height, bool (*getTo
 
 void TouchScreenImpl1::init()
 {
-#if ARCH_RASPBERRY_PI
+#if ARCH_PORTDUINO
     if (settingsMap[touchscreenModule]) {
         TouchScreenBase::init(true);
         inputBroker->registerSource(this);
@@ -49,6 +49,10 @@ void TouchScreenImpl1::onEvent(const TouchEvent &event)
 {
     InputEvent e;
     e.source = event.source;
+
+    e.touchX = event.x;
+    e.touchY = event.y;
+
     switch (event.touchEvent) {
     case TOUCH_ACTION_LEFT: {
         e.inputEvent = static_cast<char>(meshtastic_ModuleConfig_CannedMessageConfig_InputEventChar_RIGHT);

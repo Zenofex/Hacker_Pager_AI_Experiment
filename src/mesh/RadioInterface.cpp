@@ -1,5 +1,6 @@
 #include "RadioInterface.h"
 #include "Channels.h"
+#include "DisplayFormatters.h"
 #include "MeshRadio.h"
 #include "MeshService.h"
 #include "NodeDB.h"
@@ -30,18 +31,18 @@ const RegionInfo regions[] = {
     RDEF(EU_433, 433.0f, 434.0f, 10, 0, 12, true, false, false),
 
     /*
-        https://www.thethingsnetwork.org/docs/lorawan/duty-cycle/
-        https://www.thethingsnetwork.org/docs/lorawan/regional-parameters/
-        https://www.legislation.gov.uk/uksi/1999/930/schedule/6/part/III/made/data.xht?view=snippet&wrap=true
+       https://www.thethingsnetwork.org/docs/lorawan/duty-cycle/
+       https://www.thethingsnetwork.org/docs/lorawan/regional-parameters/
+       https://www.legislation.gov.uk/uksi/1999/930/schedule/6/part/III/made/data.xht?view=snippet&wrap=true
 
-        audio_permitted = false per regulation
+       audio_permitted = false per regulation
 
-        Special Note:
-        The link above describes LoRaWAN's band plan, stating a power limit of 16 dBm. This is their own suggested specification,
-        we do not need to follow it. The European Union regulations clearly state that the power limit for this frequency range is
-       500 mW, or 27 dBm. It also states that we can use interference avoidance and spectrum access techniques to avoid a duty
-       cycle. (Please refer to section 4.21 in the following document)
-        https://ec.europa.eu/growth/tools-databases/tris/index.cfm/ro/search/?trisaction=search.detail&year=2021&num=528&dLang=EN
+       Special Note:
+       The link above describes LoRaWAN's band plan, stating a power limit of 16 dBm. This is their own suggested specification,
+       we do not need to follow it. The European Union regulations clearly state that the power limit for this frequency range is
+       500 mW, or 27 dBm. It also states that we can use interference avoidance and spectrum access techniques (such as LBT +
+       AFA) to avoid a duty cycle. (Please refer to line P page 22 of this document.)
+       https://www.etsi.org/deliver/etsi_en/300200_300299/30022002/03.01.01_60/en_30022002v030101p.pdf
      */
     RDEF(EU_868, 869.4f, 869.65f, 10, 0, 27, false, false, false),
 
@@ -75,9 +76,12 @@ const RegionInfo regions[] = {
     RDEF(KR, 920.0f, 923.0f, 100, 0, 0, true, false, false),
 
     /*
-        ???
+        Taiwan, 920-925Mhz, limited to 0.5W indoor or coastal, 1.0W outdoor.
+        5.8.1 in the Low-power Radio-frequency Devices Technical Regulations
+        https://www.ncc.gov.tw/english/files/23070/102_5190_230703_1_doc_C.PDF
+        https://gazette.nat.gov.tw/egFront/e_detail.do?metaid=147283
      */
-    RDEF(TW, 920.0f, 925.0f, 100, 0, 0, true, false, false),
+    RDEF(TW, 920.0f, 925.0f, 100, 0, 27, true, false, false),
 
     /*
         https://lora-alliance.org/wp-content/uploads/2020/11/lorawan_regional_parameters_v1.0.3reva_0.pdf
@@ -108,9 +112,31 @@ const RegionInfo regions[] = {
     RDEF(UA_868, 868.0f, 868.6f, 1, 0, 14, true, false, false),
 
     /*
+        Malaysia
+        433 - 435 MHz at 100mW, no restrictions.
+        https://www.mcmc.gov.my/skmmgovmy/media/General/pdf/Short-Range-Devices-Specification.pdf
+    */
+    RDEF(MY_433, 433.0f, 435.0f, 100, 0, 20, true, false, false),
+
+    /*
+        Malaysia
+        919 - 923 Mhz at 500mW, no restrictions.
+        923 - 924 MHz at 500mW with 1% duty cycle OR frequency hopping.
+        Frequency hopping is used for 919 - 923 MHz.
+        https://www.mcmc.gov.my/skmmgovmy/media/General/pdf/Short-Range-Devices-Specification.pdf
+    */
+    RDEF(MY_919, 919.0f, 924.0f, 100, 0, 27, true, true, false),
+
+    /*
+        Singapore
+        SG_923 Band 30d: 917 - 925 MHz at 100mW, no restrictions.
+        https://www.imda.gov.sg/-/media/imda/files/regulation-licensing-and-consultations/ict-standards/telecommunication-standards/radio-comms/imdatssrd.pdf
+    */
+    RDEF(SG_923, 917.0f, 925.0f, 100, 0, 20, true, false, false),
+
+    /*
        2.4 GHZ WLAN Band equivalent. Only for SX128x chips.
     */
-
     RDEF(LORA_24, 2400.0f, 2483.5f, 100, 0, 10, true, false, true),
 
     /*
@@ -121,16 +147,23 @@ const RegionInfo regions[] = {
 };
 
 const RegionInfo *myRegion;
+bool RadioInterface::uses_default_frequency_slot = true;
 
 static uint8_t bytes[MAX_RHPACKETLEN];
 
 void initRegion()
 {
     const RegionInfo *r = regions;
+#ifdef REGULATORY_LORA_REGIONCODE
+    for (; r->code != meshtastic_Config_LoRaConfig_RegionCode_UNSET && r->code != REGULATORY_LORA_REGIONCODE; r++)
+        ;
+    LOG_INFO("Wanted region %d, regulatory override to %s\n", config.lora.region, r->name);
+#else
     for (; r->code != meshtastic_Config_LoRaConfig_RegionCode_UNSET && r->code != config.lora.region; r++)
         ;
-    myRegion = r;
     LOG_INFO("Wanted region %d, using %s\n", config.lora.region, r->name);
+#endif
+    myRegion = r;
 }
 
 /**
@@ -272,15 +305,16 @@ void printPacket(const char *prefix, const meshtastic_MeshPacket *p)
         out += " encrypted";
     }
 
-    if (p->rx_time != 0) {
+    if (p->rx_time != 0)
         out += DEBUG_PORT.mt_sprintf(" rxtime=%u", p->rx_time);
-    }
-    if (p->rx_snr != 0.0) {
+    if (p->rx_snr != 0.0)
         out += DEBUG_PORT.mt_sprintf(" rxSNR=%g", p->rx_snr);
-    }
-    if (p->rx_rssi != 0) {
+    if (p->rx_rssi != 0)
         out += DEBUG_PORT.mt_sprintf(" rxRSSI=%i", p->rx_rssi);
-    }
+    if (p->via_mqtt != 0)
+        out += DEBUG_PORT.mt_sprintf(" via MQTT");
+    if (p->hop_start != 0)
+        out += DEBUG_PORT.mt_sprintf(" hopStart=%d", p->hop_start);
     if (p->priority != 0)
         out += DEBUG_PORT.mt_sprintf(" priority=%d", p->priority);
 
@@ -309,8 +343,8 @@ bool RadioInterface::init()
     notifyDeepSleepObserver.observe(&notifyDeepSleep);
 
     // we now expect interfaces to operate in promiscuous mode
-    // radioIf.setThisAddress(nodeDB.getNodeNum()); // Note: we must do this here, because the nodenum isn't inited at constructor
-    // time.
+    // radioIf.setThisAddress(nodeDB->getNodeNum()); // Note: we must do this here, because the nodenum isn't inited at
+    // constructor time.
 
     applyModemConfig();
 
@@ -328,9 +362,9 @@ int RadioInterface::notifyDeepSleepCb(void *unused)
  * djb2 by Dan Bernstein.
  * http://www.cse.yorku.ca/~oz/hash.html
  */
-unsigned long hash(const char *str)
+uint32_t hash(const char *str)
 {
-    unsigned long hash = 5381;
+    uint32_t hash = 5381;
     int c;
 
     while ((c = *str++) != 0)
@@ -444,8 +478,8 @@ void RadioInterface::applyModemConfig()
 
     power = loraConfig.tx_power;
 
-    if ((power == 0) || ((power > myRegion->powerLimit) && !devicestate.owner.is_licensed))
-        power = myRegion->powerLimit;
+    if ((power == 0) || ((power + REGULATORY_GAIN_LORA > myRegion->powerLimit) && !devicestate.owner.is_licensed))
+        power = myRegion->powerLimit - REGULATORY_GAIN_LORA;
 
     if (power == 0)
         power = 17; // Default to this power level if we don't have a valid regional power limit (powerLimit of myRegion defaults
@@ -461,7 +495,11 @@ void RadioInterface::applyModemConfig()
     // If user has manually specified a channel num, then use that, otherwise generate one by hashing the name
     const char *channelName = channels.getName(channels.getPrimaryIndex());
     // channel_num is actually (channel_num - 1), since modulus (%) returns values from 0 to (numChannels - 1)
-    int channel_num = (loraConfig.channel_num ? loraConfig.channel_num - 1 : hash(channelName)) % numChannels;
+    uint32_t channel_num = (loraConfig.channel_num ? loraConfig.channel_num - 1 : hash(channelName)) % numChannels;
+
+    // Check if we use the default frequency slot
+    RadioInterface::uses_default_frequency_slot =
+        channel_num == hash(DisplayFormatters::getModemPresetDisplayName(config.lora.modem_preset, false)) % numChannels;
 
     // Old frequency selection formula
     // float freq = myRegion->freqStart + ((((myRegion->freqEnd - myRegion->freqStart) / numChannels) / 2) * channel_num);
@@ -535,11 +573,14 @@ size_t RadioInterface::beginSending(meshtastic_MeshPacket *p)
     h->to = p->to;
     h->id = p->id;
     h->channel = p->channel;
+    h->next_hop = 0;   // *** For future use ***
+    h->relay_node = 0; // *** For future use ***
     if (p->hop_limit > HOP_MAX) {
         LOG_WARN("hop limit %d is too high, setting to %d\n", p->hop_limit, HOP_RELIABLE);
         p->hop_limit = HOP_RELIABLE;
     }
-    h->flags = p->hop_limit | (p->want_ack ? PACKET_FLAGS_WANT_ACK_MASK : 0);
+    h->flags = p->hop_limit | (p->want_ack ? PACKET_FLAGS_WANT_ACK_MASK : 0) | (p->via_mqtt ? PACKET_FLAGS_VIA_MQTT_MASK : 0);
+    h->flags |= (p->hop_start << PACKET_FLAGS_HOP_START_SHIFT) & PACKET_FLAGS_HOP_START_MASK;
 
     // if the sender nodenum is zero, that means uninitialized
     assert(h->from);

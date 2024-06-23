@@ -6,6 +6,7 @@
 
 // Make sure that we never let our packets grow too large for one BLE packet
 #define MAX_TO_FROM_RADIO_SIZE 512
+#define SPECIAL_NONCE 69420
 
 /**
  * Provides our protobuf based API which phone/PC clients can use to talk to our device
@@ -20,13 +21,14 @@ class PhoneAPI
     : public Observer<uint32_t> // FIXME, we shouldn't be inheriting from Observer, instead use CallbackObserver as a member
 {
     enum State {
-        STATE_SEND_NOTHING,      // Initial state, don't send anything until the client starts asking for config
-        STATE_SEND_MY_INFO,      // send our my info record
-        STATE_SEND_NODEINFO,     // states progress in this order as the device sends to to the client
-        STATE_SEND_CHANNELS,     // Send all channels
-        STATE_SEND_CONFIG,       // Replacement for the old Radioconfig
-        STATE_SEND_MODULECONFIG, // Send Module specific config
+        STATE_SEND_NOTHING, // Initial state, don't send anything until the client starts asking for config
+        STATE_SEND_MY_INFO, // send our my info record
+        STATE_SEND_OWN_NODEINFO,
         STATE_SEND_METADATA,
+        STATE_SEND_CHANNELS,        // Send all channels
+        STATE_SEND_CONFIG,          // Replacement for the old Radioconfig
+        STATE_SEND_MODULECONFIG,    // Send Module specific config
+        STATE_SEND_OTHER_NODEINFOS, // states progress in this order as the device sends to to the client
         STATE_SEND_COMPLETE_ID,
         STATE_SEND_PACKETS // send packets or debug strings
     };
@@ -96,8 +98,6 @@ class PhoneAPI
 
     bool isConnected() { return state != STATE_SEND_NOTHING; }
 
-    void setInitialState() { state = STATE_SEND_MY_INFO; }
-
   protected:
     /// Our fromradio packet while it is being assembled
     meshtastic_FromRadio fromRadioScratch = {};
@@ -108,8 +108,8 @@ class PhoneAPI
     /// Hookable to find out when connection changes
     virtual void onConnectionChanged(bool connected) {}
 
-    /// If we haven't heard from the other side in a while then say not connected
-    void checkConnectionTimeout();
+    /// If we haven't heard from the other side in a while then say not connected. Returns true if timeout occurred
+    bool checkConnectionTimeout();
 
     /// Check the current underlying physical link to see if the client is currently connected
     virtual bool checkIsConnected() = 0;

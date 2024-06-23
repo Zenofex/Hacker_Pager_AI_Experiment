@@ -101,16 +101,26 @@
 #define HW_VENDOR meshtastic_HardwareModel_STATION_G1
 #elif defined(DR_DEV)
 #define HW_VENDOR meshtastic_HardwareModel_DR_DEV
+#elif defined(HELTEC_HRU_3601)
+#define HW_VENDOR meshtastic_HardwareModel_HELTEC_HRU_3601
 #elif defined(HELTEC_V3)
 #define HW_VENDOR meshtastic_HardwareModel_HELTEC_V3
 #elif defined(HELTEC_WSL_V3)
 #define HW_VENDOR meshtastic_HardwareModel_HELTEC_WSL_V3
 #elif defined(HELTEC_WIRELESS_TRACKER)
+#ifdef HELTEC_TRACKER_V1_0
+#define HW_VENDOR meshtastic_HardwareModel_HELTEC_WIRELESS_TRACKER_V1_0
+#else
 #define HW_VENDOR meshtastic_HardwareModel_HELTEC_WIRELESS_TRACKER
+#endif
+#elif defined(HELTEC_WIRELESS_PAPER_V1_0)
+#define HW_VENDOR meshtastic_HardwareModel_HELTEC_WIRELESS_PAPER_V1_0
 #elif defined(HELTEC_WIRELESS_PAPER)
 #define HW_VENDOR meshtastic_HardwareModel_HELTEC_WIRELESS_PAPER
 #elif defined(TLORA_T3S3_V1)
 #define HW_VENDOR meshtastic_HardwareModel_TLORA_T3_S3
+#elif defined(CDEBYTE_EORA_S3)
+#define HW_VENDOR meshtastic_HardwareModel_CDEBYTE_EORA_S3
 #elif defined(BETAFPV_2400_TX)
 #define HW_VENDOR meshtastic_HardwareModel_BETAFPV_2400_TX
 #elif defined(NANO_G1_EXPLORER)
@@ -121,10 +131,26 @@
 #define HW_VENDOR meshtastic_HardwareModel_PICOMPUTER_S3
 #elif defined(HELTEC_HT62)
 #define HW_VENDOR meshtastic_HardwareModel_HELTEC_HT62
+#elif defined(EBYTE_ESP32_S3)
+#define HW_VENDOR meshtastic_HardwareModel_EBYTE_ESP32_S3
+#elif defined(ESP32_S3_PICO)
+#define HW_VENDOR meshtastic_HardwareModel_ESP32_S3_PICO
 #elif defined(SENSELORA_S3)
 #define HW_VENDOR meshtastic_HardwareModel_SENSELORA_S3
 #elif defined(HELTEC_HT62)
 #define HW_VENDOR meshtastic_HardwareModel_HELTEC_HT62
+#elif defined(CHATTER_2)
+#define HW_VENDOR meshtastic_HardwareModel_CHATTER_2
+#elif defined(STATION_G2)
+#define HW_VENDOR meshtastic_HardwareModel_STATION_G2
+#elif defined(UNPHONE)
+#define HW_VENDOR meshtastic_HardwareModel_UNPHONE
+#elif defined(WIPHONE)
+#define HW_VENDOR meshtastic_HardwareModel_WIPHONE
+#elif defined(RADIOMASTER_900_BANDIT_NANO)
+#define HW_VENDOR meshtastic_HardwareModel_RADIOMASTER_900_BANDIT_NANO
+#elif defined(HELTEC_CAPSULE_SENSOR_V3)
+#define HW_VENDOR meshtastic_HardwareModel_HELTEC_CAPSULE_SENSOR_V3
 #endif
 
 // -----------------------------------------------------------------------------

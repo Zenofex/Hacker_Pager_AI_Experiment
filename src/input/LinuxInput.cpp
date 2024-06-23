@@ -1,7 +1,6 @@
-#if ARCH_RASPBERRY_PI
-#include "LinuxInput.h"
 #include "configuration.h"
-
+#if ARCH_PORTDUINO
+#include "LinuxInput.h"
 #include "platform/portduino/PortduinoGlue.h"
 #include <assert.h>
 #include <ctype.h>
@@ -21,6 +20,12 @@
 LinuxInput::LinuxInput(const char *name) : concurrency::OSThread(name)
 {
     this->_originName = name;
+}
+
+void LinuxInput::deInit()
+{
+    if (fd >= 0)
+        close(fd);
 }
 
 int32_t LinuxInput::runOnce()
@@ -149,6 +154,9 @@ int32_t LinuxInput::runOnce()
                         e.kbchar = 0xb7;
                     case KEY_ENTER: // Enter
                         e.inputEvent = meshtastic_ModuleConfig_CannedMessageConfig_InputEventChar_SELECT;
+                        break;
+                    case KEY_POWER:
+                        system("poweroff");
                         break;
                     default: // all other keys
                         if (keymap[code]) {

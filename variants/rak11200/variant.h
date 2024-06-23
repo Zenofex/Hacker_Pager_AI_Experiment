@@ -3,14 +3,6 @@
 
 #include <stdint.h>
 
-#define EXTERNAL_NUM_INTERRUPTS 16
-#define NUM_DIGITAL_PINS 40
-#define NUM_ANALOG_INPUTS 16
-
-#define analogInputToDigitalPin(p) (((p) < 20) ? (esp32_adc2gpio[(p)]) : -1)
-#define digitalPinToInterrupt(p) (((p) < 40) ? (p) : -1)
-#define digitalPinHasPWM(p) (p < 34)
-
 #define LED_GREEN 12
 #define LED_BLUE 2
 
@@ -56,6 +48,8 @@ static const uint8_t SCK = 33;
 #define LED_PIN LED_BLUE
 
 #define PIN_VBAT WB_A0
+#define BATTERY_PIN PIN_VBAT
+#define ADC_CHANNEL ADC1_GPIO36_CHANNEL
 
 // https://docs.rakwireless.com/Product-Categories/WisBlock/RAK13300/
 

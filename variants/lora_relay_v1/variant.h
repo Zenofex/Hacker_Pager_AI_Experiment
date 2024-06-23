@@ -44,7 +44,11 @@ extern "C" {
 // LEDs
 #define PIN_LED1 (3)
 #define PIN_LED2 (4)
-#define PIN_NEOPIXEL (8)
+// #define PIN_NEOPIXEL (8)
+#define HAS_NEOPIXEL                         // Enable the use of neopixels
+#define NEOPIXEL_COUNT 1                     // How many neopixels are connected
+#define NEOPIXEL_DATA 8                      // gpio pin used to send data to the neopixels
+#define NEOPIXEL_TYPE (NEO_GRB + NEO_KHZ800) // type of neopixels in use
 
 #define LED_BUILTIN PIN_LED1
 #define LED_CONN PIN_LED2
@@ -80,6 +84,7 @@ static const uint8_t A5 = PIN_A5;
 // Other pins
 #define PIN_AREF PIN_A5
 #define PIN_VBAT PIN_A4
+#define BATTERY_PIN PIN_VBAT
 #define PIN_NFC1 (33)
 #define PIN_NFC2 (2)
 #define PIN_PIEZO (37)

@@ -3,12 +3,17 @@
 #include "RTC.h"
 #include "concurrency/OSThread.h"
 #include "configuration.h"
+#include "main.h"
 #include <assert.h>
 #include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <sys/time.h>
 #include <time.h>
+
+#ifdef ARCH_PORTDUINO
+#include "platform/portduino/PortduinoGlue.h"
+#endif
 
 /**
  * A printer that doesn't go anywhere
@@ -68,7 +73,15 @@ size_t RedirectablePrint::vprintf(const char *format, va_list arg)
 
 size_t RedirectablePrint::log(const char *logLevel, const char *format, ...)
 {
-    if (moduleConfig.serial.override_console_serial_port && strcmp(logLevel, "DEBUG") == 0) {
+#ifdef ARCH_PORTDUINO
+    if (settingsMap[logoutputlevel] < level_debug && strcmp(logLevel, MESHTASTIC_LOG_LEVEL_DEBUG) == 0)
+        return 0;
+    else if (settingsMap[logoutputlevel] < level_info && strcmp(logLevel, MESHTASTIC_LOG_LEVEL_INFO) == 0)
+        return 0;
+    else if (settingsMap[logoutputlevel] < level_warn && strcmp(logLevel, MESHTASTIC_LOG_LEVEL_WARN) == 0)
+        return 0;
+#endif
+    if (moduleConfig.serial.override_console_serial_port && strcmp(logLevel, MESHTASTIC_LOG_LEVEL_DEBUG) == 0) {
         return 0;
     }
     size_t r = 0;
@@ -87,7 +100,7 @@ size_t RedirectablePrint::log(const char *logLevel, const char *format, ...)
 
         // If we are the first message on a report, include the header
         if (!isContinuationMessage) {
-            uint32_t rtc_sec = getValidTime(RTCQuality::RTCQualityDevice);
+            uint32_t rtc_sec = getValidTime(RTCQuality::RTCQualityDevice, true); // display local time on logfile
             if (rtc_sec > 0) {
                 long hms = rtc_sec % SEC_PER_DAY;
                 // hms += tz.tz_dsttime * SEC_PER_HOUR;
@@ -99,10 +112,17 @@ size_t RedirectablePrint::log(const char *logLevel, const char *format, ...)
                 int hour = hms / SEC_PER_HOUR;
                 int min = (hms % SEC_PER_HOUR) / SEC_PER_MIN;
                 int sec = (hms % SEC_PER_HOUR) % SEC_PER_MIN; // or hms % SEC_PER_MIN
-
+#ifdef ARCH_PORTDUINO
+                r += ::printf("%s | %02d:%02d:%02d %u ", logLevel, hour, min, sec, millis() / 1000);
+#else
                 r += printf("%s | %02d:%02d:%02d %u ", logLevel, hour, min, sec, millis() / 1000);
+#endif
             } else
+#ifdef ARCH_PORTDUINO
+                r += ::printf("%s | ??:??:?? %u ", logLevel, millis() / 1000);
+#else
                 r += printf("%s | ??:??:?? %u ", logLevel, millis() / 1000);
+#endif
 
             auto thread = concurrency::OSThread::currentThread;
             if (thread) {
@@ -147,9 +167,43 @@ size_t RedirectablePrint::log(const char *logLevel, const char *format, ...)
         }
 #endif
 
-        va_end(arg);
-
         isContinuationMessage = !hasNewline;
+
+        if (config.bluetooth.device_logging_enabled && !pauseBluetoothLogging) {
+            bool isBleConnected = false;
+#ifdef ARCH_ESP32
+            isBleConnected = nimbleBluetooth && nimbleBluetooth->isActive() && nimbleBluetooth->isConnected();
+#elif defined(ARCH_NRF52)
+            isBleConnected = nrf52Bluetooth != nullptr && nrf52Bluetooth->isConnected();
+#endif
+            if (isBleConnected) {
+                char *message;
+                size_t initialLen;
+                size_t len;
+                initialLen = strlen(format);
+                message = new char[initialLen + 1];
+                len = vsnprintf(message, initialLen + 1, format, arg);
+                if (len > initialLen) {
+                    delete[] message;
+                    message = new char[len + 1];
+                    vsnprintf(message, len + 1, format, arg);
+                }
+                auto thread = concurrency::OSThread::currentThread;
+#ifdef ARCH_ESP32
+                if (thread)
+                    nimbleBluetooth->sendLog(mt_sprintf("%s | [%s] %s", logLevel, thread->ThreadName.c_str(), message).c_str());
+                else
+                    nimbleBluetooth->sendLog(mt_sprintf("%s | %s", logLevel, message).c_str());
+#elif defined(ARCH_NRF52)
+                if (thread)
+                    nrf52Bluetooth->sendLog(mt_sprintf("%s | [%s] %s", logLevel, thread->ThreadName.c_str(), message).c_str());
+                else
+                    nrf52Bluetooth->sendLog(mt_sprintf("%s | %s", logLevel, message).c_str());
+#endif
+                delete[] message;
+            }
+        }
+        va_end(arg);
 #ifdef HAS_FREE_RTOS
         xSemaphoreGive(inDebugPrint);
 #else
@@ -163,11 +217,11 @@ size_t RedirectablePrint::log(const char *logLevel, const char *format, ...)
 void RedirectablePrint::hexDump(const char *logLevel, unsigned char *buf, uint16_t len)
 {
     const char alphabet[17] = "0123456789abcdef";
-    log(logLevel, "   +------------------------------------------------+ +----------------+\n");
-    log(logLevel, "   |.0 .1 .2 .3 .4 .5 .6 .7 .8 .9 .a .b .c .d .e .f | |      ASCII     |\n");
+    log(logLevel, "    +------------------------------------------------+ +----------------+\n");
+    log(logLevel, "    |.0 .1 .2 .3 .4 .5 .6 .7 .8 .9 .a .b .c .d .e .f | |      ASCII     |\n");
     for (uint16_t i = 0; i < len; i += 16) {
         if (i % 128 == 0)
-            log(logLevel, "   +------------------------------------------------+ +----------------+\n");
+            log(logLevel, "    +------------------------------------------------+ +----------------+\n");
         char s[] = "|                                                | |                |\n";
         uint8_t ix = 1, iy = 52;
         for (uint8_t j = 0; j < 16; j++) {
@@ -189,7 +243,7 @@ void RedirectablePrint::hexDump(const char *logLevel, unsigned char *buf, uint16
         log(logLevel, ".");
         log(logLevel, s);
     }
-    log(logLevel, "   +------------------------------------------------+ +----------------+\n");
+    log(logLevel, "    +------------------------------------------------+ +----------------+\n");
 }
 
 std::string RedirectablePrint::mt_sprintf(const std::string fmt_str, ...)
