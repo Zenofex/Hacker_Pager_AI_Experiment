@@ -15,6 +15,7 @@
     "vector": "cpp",
     "string_view": "cpp",
     "initializer_list": "cpp",
-    "*.tpp": "cpp"
+    "*.tpp": "cpp",
+    "*.xbm": "cpp"
   }
 }
