@@ -85,9 +85,10 @@
 #include "modules/SerialModule.h"
 #endif
 #endif
-
 #if !MESHTASTIC_EXCLUDE_DROPZONE
 #include "modules/DropzoneModule.h"
+#ifdef EXPLOITEERS_PAGER
+#include "modules/exploiteers_pager/PagerModule.h"
 #endif
 
 /**
@@ -230,6 +231,8 @@ void setupModules()
 #if !MESHTASTIC_EXCLUDE_RANGETEST && !MESHTASTIC_EXCLUDE_GPS
         new RangeTestModule();
 #endif
+#ifdef EXPLOITEERS_PAGER
+        new PagerModule();
 #endif
     } else {
 #if !MESHTASTIC_EXCLUDE_ADMIN
