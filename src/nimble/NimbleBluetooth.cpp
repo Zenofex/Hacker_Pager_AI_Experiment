@@ -10,6 +10,10 @@
 #include "sleep.h"
 #include <NimBLEDevice.h>
 
+#ifdef EXPLOITEERS_PAGER
+#include "modules/exploiteers_pager/PagerModule.h"
+#endif
+
 NimBLECharacteristic *fromNumCharacteristic;
 NimBLECharacteristic *BatteryCharacteristic;
 NimBLECharacteristic *logRadioCharacteristic;
@@ -119,6 +123,10 @@ class NimbleBluetoothServerCallback : public NimBLEServerCallbacks
         });
 #endif
         passkeyShowing = true;
+
+        #ifdef EXPLOITEERS_PAGER
+        pagerModule->handleBluetoothPin(passkey);
+        #endif
 
         return passkey;
     }
