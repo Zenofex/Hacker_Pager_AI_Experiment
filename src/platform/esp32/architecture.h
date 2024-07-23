@@ -105,6 +105,10 @@
 #define HW_VENDOR meshtastic_HardwareModel_HELTEC_HRU_3601
 #elif defined(HELTEC_V3)
 #define HW_VENDOR meshtastic_HardwareModel_HELTEC_V3
+#if defined(EXPLOITEERS_PAGER)
+#undef HW_VENDOR
+#define HW_VENDOR meshtastic_HardwareModel_PRIVATE_HW  // TODO
+#endif
 #elif defined(HELTEC_WSL_V3)
 #define HW_VENDOR meshtastic_HardwareModel_HELTEC_WSL_V3
 #elif defined(HELTEC_WIRELESS_TRACKER)
