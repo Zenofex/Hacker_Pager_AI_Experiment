@@ -490,7 +490,12 @@ void NodeDB::installDefaultConfig(bool preserveKey = false)
 #else
     config.bluetooth.mode = hasScreen ? meshtastic_Config_BluetoothConfig_PairingMode_RANDOM_PIN
                                       : meshtastic_Config_BluetoothConfig_PairingMode_FIXED_PIN;
+#ifdef EXPLOITEERS_PAGER
+    // EXPLOITEERS_PAGER has a custom screen, not using hasScreen.
+    config.bluetooth.mode = meshtastic_Config_BluetoothConfig_PairingMode_RANDOM_PIN;
 #endif
+#endif
+
     // for backward compat, default position flags are ALT+MSL
     config.position.position_flags =
         (meshtastic_Config_PositionConfig_PositionFlags_ALTITUDE | meshtastic_Config_PositionConfig_PositionFlags_ALTITUDE_MSL |
