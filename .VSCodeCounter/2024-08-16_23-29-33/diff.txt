@@ -1,0 +1,63 @@
+Date : 2024-08-16 23:29:33
+Directory : c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager
+Total : 29 files,  -1196 codes, 0 comments, -50 blanks, all -1246 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| C++      |         29 |     -1,196 |          0 |        -50 |     -1,246 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++---------------------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                                                                  | files      | code       | comment    | blank      | total      |
++---------------------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                                                     |         29 |     -1,196 |          0 |        -50 |     -1,246 |
+| . (Files)                                                                                                                             |          1 |        -24 |          0 |         -2 |        -26 |
+| apps                                                                                                                                  |         25 |     -1,158 |          0 |        -44 |     -1,202 |
+| apps\datetime                                                                                                                         |          1 |       -110 |          0 |         -2 |       -112 |
+| apps\dialog                                                                                                                           |          1 |       -132 |          0 |         -2 |       -134 |
+| apps\keyboard                                                                                                                         |          5 |       -159 |          0 |         -7 |       -166 |
+| apps\launcher                                                                                                                         |         13 |       -438 |          0 |        -24 |       -462 |
+| apps\messages                                                                                                                         |          3 |        -50 |          0 |         -6 |        -56 |
+| apps\settings                                                                                                                         |          1 |       -131 |          0 |         -1 |       -132 |
+| apps\splash                                                                                                                           |          1 |       -138 |          0 |         -2 |       -140 |
+| emoji                                                                                                                                 |          3 |        -14 |          0 |         -4 |        -18 |
++---------------------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++---------------------------------------------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                                                                                              | language | code       | comment    | blank      | total      |
++---------------------------------------------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\datetime\datetime.xbm       | C++      |       -110 |          0 |         -2 |       -112 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\dialog\dialog.xbm           | C++      |       -132 |          0 |         -2 |       -134 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\keyboard\boxleft.xbm        | C++      |         -6 |          0 |         -1 |         -7 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\keyboard\boxright.xbm       | C++      |         -6 |          0 |         -1 |         -7 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\keyboard\btn_confirm.xbm    | C++      |        -10 |          0 |         -2 |        -12 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\keyboard\keyboard.xbm       | C++      |       -132 |          0 |         -2 |       -134 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\keyboard\x2.xbm             | C++      |         -5 |          0 |         -1 |         -6 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\app_data.xbm       | C++      |        -24 |          0 |         -2 |        -26 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\app_data_s.xbm     | C++      |        -24 |          0 |         -2 |        -26 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\app_lora.xbm       | C++      |        -24 |          0 |         -2 |        -26 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\app_lora_s.xbm     | C++      |        -24 |          0 |         -2 |        -26 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\app_msg.xbm        | C++      |        -31 |          0 |         -2 |        -33 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\app_msg_s.xbm      | C++      |        -31 |          0 |         -2 |        -33 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\app_settings.xbm   | C++      |        -31 |          0 |         -2 |        -33 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\app_settings_s.xbm | C++      |        -31 |          0 |         -2 |        -33 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\app_test.xbm       | C++      |        -31 |          0 |         -2 |        -33 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\app_test_s.xbm     | C++      |        -31 |          0 |         -2 |        -33 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\launcher.xbm       | C++      |       -132 |          0 |         -2 |       -134 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\nav.xbm            | C++      |        -12 |          0 |         -1 |        -13 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\navr.xbm           | C++      |        -12 |          0 |         -1 |        -13 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\messages\btn_send.xbm       | C++      |        -10 |          0 |         -2 |        -12 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\messages\divider.xbm        | C++      |         -6 |          0 |         -2 |         -8 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\messages\nomessages.xbm     | C++      |        -34 |          0 |         -2 |        -36 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\settings\tutorial.xbm       | C++      |       -131 |          0 |         -1 |       -132 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\splash\splash.xbm           | C++      |       -138 |          0 |         -2 |       -140 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\emoji\emoji_downtri.xbm          | C++      |         -4 |          0 |         -1 |         -5 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\emoji\emoji_lefttri.xbm          | C++      |         -4 |          0 |         -1 |         -5 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\emoji\emoji_rabbit.xbm           | C++      |         -6 |          0 |         -2 |         -8 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\statusbar.xbm                    | C++      |        -24 |          0 |         -2 |        -26 |
+| Total                                                                                                                                 |          |     -1,196 |          0 |        -50 |     -1,246 |
++---------------------------------------------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+

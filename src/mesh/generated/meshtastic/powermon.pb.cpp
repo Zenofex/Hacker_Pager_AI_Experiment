@@ -13,7 +13,3 @@ PB_BIND(meshtastic_PowerStressMessage, meshtastic_PowerStressMessage, AUTO)
 
 
 
-
-
-
-

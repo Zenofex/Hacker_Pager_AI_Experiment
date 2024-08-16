@@ -1,0 +1,89 @@
+Date : 2024-08-28 19:26:57
+Directory : c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager
+Total : 50 files,  4245 codes, 272 comments, 932 blanks, all 5449 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| C++      |         50 |      4,245 |        272 |        932 |      5,449 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++----------------------------------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                                                                               | files      | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                                                                  |         50 |      4,245 |        272 |        932 |      5,449 |
+| . (Files)                                                                                                                                          |         22 |      2,093 |        243 |        486 |      2,822 |
+| apps                                                                                                                                               |         25 |      1,826 |         20 |        391 |      2,237 |
+| apps\datetime                                                                                                                                      |          2 |         79 |          0 |         27 |        106 |
+| apps\dialog                                                                                                                                        |          2 |        101 |          1 |         28 |        130 |
+| apps\keyboard                                                                                                                                      |          2 |        195 |          5 |         38 |        238 |
+| apps\launcher                                                                                                                                      |          2 |        166 |          0 |         32 |        198 |
+| apps\messages                                                                                                                                      |          3 |        298 |          2 |         44 |        344 |
+| apps\nodeinfo                                                                                                                                      |          2 |         36 |          0 |         22 |         58 |
+| apps\pcap                                                                                                                                          |          2 |        282 |          4 |         52 |        338 |
+| apps\screensettings                                                                                                                                |          2 |         84 |          0 |         29 |        113 |
+| apps\settings                                                                                                                                      |          2 |        380 |          8 |         54 |        442 |
+| apps\splash                                                                                                                                        |          2 |         43 |          0 |         22 |         65 |
+| apps\test_utils                                                                                                                                    |          2 |        105 |          0 |         26 |        131 |
+| apps\ui_widgets                                                                                                                                    |          2 |         57 |          0 |         17 |         74 |
+| packetcapture                                                                                                                                      |          3 |        326 |          9 |         55 |        390 |
++----------------------------------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++----------------------------------------------------------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                                                                                                           | language | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\PagerModule.cpp                               | C++      |        107 |          7 |         27 |        141 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\PagerModule.h                                 | C++      |         20 |          3 |          5 |         28 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\datetime\datetime_window.cpp             | C++      |         51 |          0 |         15 |         66 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\datetime\datetime_window.h               | C++      |         28 |          0 |         12 |         40 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\dialog\dialog_window.cpp                 | C++      |         67 |          0 |         15 |         82 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\dialog\dialog_window.h                   | C++      |         34 |          1 |         13 |         48 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\keyboard\keyboard_window.cpp             | C++      |        162 |          5 |         23 |        190 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\keyboard\keyboard_window.h               | C++      |         33 |          0 |         15 |         48 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\launcher_window.cpp             | C++      |         74 |          0 |         18 |         92 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\launcher\launcher_window.h               | C++      |         92 |          0 |         14 |        106 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\messages\messagecompose.xbm.h            | C++      |        132 |          0 |          2 |        134 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\messages\messages_window.cpp             | C++      |        138 |          2 |         28 |        168 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\messages\messages_window.h               | C++      |         28 |          0 |         14 |         42 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\nodeinfo\nodeinfo_window.cpp             | C++      |         18 |          0 |         13 |         31 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\nodeinfo\nodeinfo_window.h               | C++      |         18 |          0 |          9 |         27 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\pcap\pcap_window.cpp                     | C++      |        255 |          4 |         39 |        298 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\pcap\pcap_window.h                       | C++      |         27 |          0 |         13 |         40 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\screensettings\screensettings_window.cpp | C++      |         57 |          0 |         16 |         73 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\screensettings\screensettings_window.h   | C++      |         27 |          0 |         13 |         40 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\settings\settings_window.cpp             | C++      |        303 |          8 |         39 |        350 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\settings\settings_window.h               | C++      |         77 |          0 |         15 |         92 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\splash\splash_window.cpp                 | C++      |         27 |          0 |         13 |         40 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\splash\splash_window.h                   | C++      |         16 |          0 |          9 |         25 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\test_utils\test_utils_window.cpp         | C++      |         44 |          0 |         14 |         58 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\test_utils\test_utils_window.h           | C++      |         61 |          0 |         12 |         73 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\ui_widgets\list.cpp                      | C++      |         33 |          0 |          7 |         40 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\apps\ui_widgets\list.h                        | C++      |         24 |          0 |         10 |         34 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\buzzer_manager.cpp                            | C++      |         90 |          0 |         31 |        121 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\buzzer_manager.h                              | C++      |         51 |          1 |         22 |         74 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\datetime.h                                    | C++      |         27 |          0 |          5 |         32 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\display_manager.cpp                           | C++      |        446 |         58 |         90 |        594 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\display_manager.h                             | C++      |         85 |         40 |         30 |        155 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\draw_string.cpp                               | C++      |         50 |          0 |         11 |         61 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\draw_string.h                                 | C++      |         12 |          1 |          6 |         19 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\graphics.h                                    | C++      |          1 |          0 |          1 |          2 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\led_buffer.cpp                                | C++      |         40 |          0 |          6 |         46 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\led_buffer.h                                  | C++      |        119 |         84 |         31 |        234 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\led_manager.cpp                               | C++      |        176 |         10 |         52 |        238 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\led_manager.h                                 | C++      |         81 |          4 |         20 |        105 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\packetcapture\packet_capture.cpp              | C++      |        219 |          4 |         30 |        253 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\packetcapture\packet_capture.h                | C++      |         64 |          1 |         13 |         78 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\packetcapture\pcap.h                          | C++      |         43 |          4 |         12 |         59 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\rick.h                                        | C++      |        173 |         14 |         18 |        205 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\songs.h                                       | C++      |        167 |         10 |         23 |        200 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\storage_manager.cpp                           | C++      |        299 |          9 |         50 |        358 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\storage_manager.h                             | C++      |         50 |          0 |         21 |         71 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\util.cpp                                      | C++      |         25 |          0 |          6 |         31 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\util.h                                        | C++      |         25 |          0 |         10 |         35 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\window.cpp                                    | C++      |         14 |          0 |          5 |         19 |
+| c:\Users\ianwh\Projects\Pager\platformio_workspace\meshtastic\firmware\src\modules\exploiteers_pager\window.h                                      | C++      |         35 |          2 |         16 |         53 |
+| Total                                                                                                                                              |          |      4,245 |        272 |        932 |      5,449 |
++----------------------------------------------------------------------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
