@@ -201,6 +201,7 @@ template <typename T> bool SX126xInterface<T>::reconfigure()
     if (err != RADIOLIB_ERR_NONE)
         RECORD_CRITICALERROR(meshtastic_CriticalErrorCode_INVALID_RADIO_SETTING);
 
+    LOG_INFO("!!!!!!!!!!!!!!!!!! Setting sync word to %x\n", syncWord);
     err = lora.setSyncWord(syncWord);
     if (err != RADIOLIB_ERR_NONE)
         LOG_ERROR("SX126X setSyncWord %s%d", radioLibErr, err);

@@ -15,6 +15,11 @@
 #include "PortduinoGlue.h"
 #include "meshUtils.h"
 #endif
+
+#ifdef EXPLOITEERS_PAGER
+#include "modules/exploiteers_pager/PagerModule.h"
+#endif
+
 void LockingArduinoHal::spiBeginTransaction()
 {
     spiLock->lock();
@@ -395,6 +400,13 @@ void RadioLibInterface::handleReceiveInterrupt()
         printBytes("Raw incoming packet: ", (uint8_t *)&radioBuffer, length);
     }
 #endif
+
+    #ifdef EXPLOITEERS_PAGER
+    if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_ERR_CRC_MISMATCH) {
+        pagerModule->handleRawPacket((uint8_t *)&radioBuffer, length, false);
+    }
+    #endif
+
     if (state != RADIOLIB_ERR_NONE) {
         LOG_ERROR("Ignore received packet due to error=%d", state);
         rxBad++;
