@@ -107,6 +107,10 @@ AccelerometerThread *accelerometerThread = nullptr;
 AudioThread *audioThread = nullptr;
 #endif
 
+#ifdef EXPLOITEERS_PAGER
+#include "modules/exploiteers_pager/PagerModule.h"
+#endif
+
 using namespace concurrency;
 
 // We always create a screen object, but we only init it if we find the hardware
@@ -850,6 +854,9 @@ void setup()
         } else {
             LOG_INFO("SX1262 Radio init succeeded, using SX1262 radio\n");
             radioType = SX1262_RADIO;
+#ifdef EXPLOITEERS_PAGER
+            pagerModule->setRadio(static_cast<SX1262Interface*>(rIf));
+#endif
         }
     }
 #endif

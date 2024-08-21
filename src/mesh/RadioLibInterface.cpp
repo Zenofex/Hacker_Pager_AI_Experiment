@@ -9,6 +9,10 @@
 #include <pb_decode.h>
 #include <pb_encode.h>
 
+#ifdef EXPLOITEERS_PAGER
+#include "modules/exploiteers_pager/PagerModule.h"
+#endif
+
 void LockingArduinoHal::spiBeginTransaction()
 {
     spiLock->lock();
@@ -355,6 +359,13 @@ void RadioLibInterface::handleReceiveInterrupt()
     xmitMsec = getPacketTime(length);
 
     int state = iface->readData(radiobuf, length);
+
+    #ifdef EXPLOITEERS_PAGER
+    if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_ERR_CRC_MISMATCH) {
+        pagerModule->handleRawPacket(radiobuf, length, false);
+    }
+    #endif
+
     if (state != RADIOLIB_ERR_NONE) {
         LOG_ERROR("ignoring received packet due to error=%d\n", state);
         rxBad++;
