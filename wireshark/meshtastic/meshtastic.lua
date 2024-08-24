@@ -1,0 +1,275 @@
+-- Installation Instructions
+--
+-- 1. Copy the meshtastic/ directory to the plugins/ directory of your "personal configuration folder".
+--   See: https://www.wireshark.org/docs/wsug_html_chunked/ChAppFilesConfigurationSection.html
+--   (you may need to create the plugins/ directory)
+--   E.g. C:\Users\Dade\AppData\Roaming\Wireshark\plugins\meshtastic
+-- 2. Open Wireshark.
+-- 3. Edit > Preferences > Protocols > ProtoBuf
+--   4. Check "Load .proto files on startup."
+--   5. Check "Dissect protobuf fields as Wireshark fields."
+--   6. Click "Edit..." next to "Protobuf search paths".
+--     7. Add the plugins/meshtastic/protobuf/ directory.
+--     8. Check "Load all files" next to new entry.
+-- 9. Save and close preferences.
+-- 10. Open .pcap file.
+
+local info = {
+    version = "1.0",
+    author = "exploitee.rs",
+};
+set_plugin_info(info);
+
+local ciphermode = require("meshtastic.aeslua.ciphermode");
+local protobuf_dissector = Dissector.get("protobuf");
+local ip_dissector = Dissector.get("ip");
+
+local function get_crypto_key(key_base64_str)
+    local default_psk = {
+        0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59, 
+        0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01
+    };
+
+    local user_key = ByteArray.new(key_base64_str, true):base64_decode();
+
+    if user_key:len() == 0 then
+        -- Encryption disabled.
+        return {};
+    elseif (user_key:len() == 1) then
+        -- Key is the default key with its last byte incremented by the user key.
+        local key = default_psk;
+        key[#key] = key[#key] + (user_key:int() - 1);
+        return key;
+    elseif (user_key:len() < 16) then
+        local key = user_key;
+        key:set_size(16);
+        return key;
+    elseif (user_key:len() < 32) then
+        local key = user_key;
+        key:set_size(32);
+        return key;
+    end
+end
+
+
+local function get_crypto_iv(packet_id_range, from_range)
+    local iv = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    for i = 1, 4 do
+        iv[i] = packet_id_range:bytes():get_index(i - 1);
+        iv[i + 8] = from_range:bytes():get_index(i - 1);
+    end
+    return iv;
+end
+
+
+-- Protocol for the outer packet. Invoked when the LoRa syncword is 0x2b.
+local proto_meshtastic = Proto.new("meshtastic", "Meshtastic");
+proto_meshtastic.prefs.crypto_key = Pref.string("Primary channel encryption key (base64)", "AQ==");
+local p = proto_meshtastic;
+p.fields.to = ProtoField.uint32("meshtastic.to", "Destination node", base.HEX);
+local f_to = Field.new("meshtastic.to");
+p.fields.from = ProtoField.uint32("meshtastic.from", "Sender node", base.HEX);
+local f_from = Field.new("meshtastic.from");
+p.fields.id = ProtoField.uint32("meshtastic.id", "Packet ID", base.HEX);
+p.fields.flags = ProtoField.uint8("meshtastic.flags", "Flags", base.HEX);
+p.fields.hop_limit = ProtoField.uint8("meshtastic.flags.hop_limit", "Hop limit (remaining hops)", base.DEC, nil, 0x07);
+p.fields.hop_start = ProtoField.uint8("meshtastic.flags.hop_start", "Hop limit (original)", base.DEC, nil, 0xE0);
+p.fields.want_ack = ProtoField.bool("meshtastic.flags.want_ack", "ACK requested", 8, nil, 0x08);
+p.fields.via_mqtt = ProtoField.bool("meshtastic.flags.via_mqtt", "Path included MQTT", 8, nil, 0x10);
+p.fields.channel = ProtoField.uint8("meshtastic.channel_hash", "Channel hash", base.HEX);
+p.fields.next_hop = ProtoField.uint8("meshtastic.next_hop", "Next hop node (unused)", base.HEX);
+p.fields.relay_node = ProtoField.uint8("meshtastic.relay_node", "Relay node (unused)", base.HEX);
+p.fields.payload = ProtoField.protocol("meshtastic.payload", "Payload", base.NONE);
+p.fields.payload_decrypted = ProtoField.protocol("meshtastic.payload.decrypted", "Decrypted (using key in preferences)", base.NONE);
+p.fields.portnum = ProtoField.int32("meshtastic.payload.portnum", "Portnum", base.DEC, {
+    [1]="TEXT_MESSAGE_APP",
+    [2]="REMOTE_HARDWARE_APP",
+    [3]="POSITION_APP",
+    [4]="NODEINFO_APP",
+    [5]="ROUTING_APP",
+    [6]="ADMIN_APP",
+    [7]="TEXT_MESSAGE_COMPRESSED_APP",
+    [8]="WAYPOINT_APP",
+    [9]="AUDIO_APP",
+    [10]="DETECTION_SENSOR_APP",
+    [32]="REPLY_APP",
+    [33]="IP_TUNNEL_APP",
+    [34]="PAXCOUNTER_APP",
+    [64]="SERIAL_APP",
+    [65]="STORE_FORWARD_APP",
+    [66]="RANGE_TEST_APP",
+    [67]="TELEMETRY_APP",
+    [68]="ZPS_APP",
+    [69]="SIMULATOR_APP",
+    [70]="TRACEROUTE_APP",
+    [71]="NEIGHBORINFO_APP",
+    [72]="ATAK_PLUGIN",
+    [73]="MAP_REPORT_APP",
+    [256]="PRIVATE_APP",
+    [257]="ATAK_FORWARDER",
+});
+p.experts.malformed = ProtoExpert.new("meshtastic.malformed", "Invalid meshtastic.Data proto", expert.group.MALFORMED, expert.severity.ERROR);
+-- Reuse this status field from eth so that built-in packet coloring rules for status will apply:
+p.fields.status = ProtoField.uint8("eth.fcs.status", "Status");
+
+
+-- Sub-protocol for the payload, chained to the protobuf dissector, which is invoked by the outer protocol.
+local proto_meshtastic_payload = Proto.new("meshtastic_data_payload", "meshtastic_data_payload");
+proto_meshtastic_payload.fields.text = ProtoField.string("meshtastic.payload.text", "Text message", base.UNICODE);
+-- The protobuf dissector only defines its fields after it has already run. To
+-- avoid undefined field errors, create placeholder fields with the same types
+-- that will be overwritten later by the protobuf dissector. These Fields will
+-- actually read data created by the protobuf dissector, not proto_meshtastic.
+proto_meshtastic_payload.fields._dontuse1 = ProtoField.int32("pbf.meshtastic.Data.portnum", "portnum", base.DEC);
+local f_proto_meshtastic_Data_portnum = Field.new("pbf.meshtastic.Data.portnum");
+proto_meshtastic_payload.fields._dontuse2 = ProtoField.string("pbf.meshtastic.User.long_name", "long_name", base.NONE);
+local f_proto_meshtastic_User_long_name = Field.new("pbf.meshtastic.User.long_name");
+
+
+function proto_meshtastic.dissector(tvb, pinfo, treeitem)
+    local subtree = treeitem:add(proto_meshtastic, tvb());
+    local pos = 0;
+
+    subtree:add_le(p.fields.to, tvb(pos, 4));
+    pos = pos + 4;
+
+    local from_range = tvb(pos, 4);
+    subtree:add_le(p.fields.from, from_range);
+    pos = pos + 4;
+
+    local packet_id_range = tvb(pos, 4);
+    subtree:add_le(p.fields.id, packet_id_range);
+    pos = pos + 4;
+
+    local flag_byte = tvb(pos, 1);
+    pos = pos + 1;
+    local flags = subtree:add(p.fields.flags, flag_byte)
+    flags:add(p.fields.hop_limit, flag_byte);
+    flags:add(p.fields.hop_start, flag_byte);
+    flags:add(p.fields.want_ack, flag_byte);
+    flags:add(p.fields.via_mqtt, flag_byte);
+
+    subtree:add(p.fields.channel, tvb(pos, 1));
+    pos = pos + 1;
+
+    subtree:add(p.fields.next_hop, tvb(pos, 1));
+    pos = pos + 1;
+
+    subtree:add(p.fields.relay_node, tvb(pos, 1));
+    pos = pos + 1;
+
+    local payload_tvb = tvb(pos);
+    local payload_tree = subtree:add(p.fields.payload, payload_tvb);
+    payload_tree:set_text("Payload: " .. payload_tvb:len() .. " bytes");
+    
+    local data_bytearray = tvb(pos):bytes();
+    local data_size = data_bytearray:len();
+    data_bytearray:set_size(256);
+    local data = data_bytearray:raw();
+    
+    local protobuf_tree;
+    local protobuf_tvb;
+    local key = get_crypto_key(proto_meshtastic.prefs.crypto_key);
+    if #key > 0 then
+        local iv = get_crypto_iv(packet_id_range, from_range);
+        local decrypted = string.sub(ciphermode.decryptString(key, data, ciphermode.decryptCTR, iv), 1, data_size);
+        protobuf_tvb = ByteArray.new(decrypted, true):tvb("Decrypted payload");
+        protobuf_tree = payload_tree:add(p.fields.payload_decrypted, protobuf_tvb());
+    else
+        -- Skip decryption.
+        protobuf_tvb = payload_tvb;
+        protobuf_tree = payload_tree;
+    end
+    pinfo.private["pb_msg_type"] = "message,meshtastic.Data";
+    pcall(Dissector.call, protobuf_dissector, protobuf_tvb, pinfo, protobuf_tree);
+
+    local portnum = f_proto_meshtastic_Data_portnum();
+    if portnum ~= nil then
+        subtree:add(p.fields.portnum, portnum.value);
+        pinfo.cols.dst_port = portnum.value;
+    else
+        protobuf_tree:add_tvb_expert_info(p.experts.malformed, protobuf_tvb);
+        protobuf_tree:add(p.fields.status, 0):set_hidden(true);
+        pinfo.cols.info:set("Malformed meshtastic.Data protobuf");
+    end
+
+    -- Update columns with tree field values.
+    pinfo.cols.protocol:set('Meshtastic');
+    pinfo.cols.src:set(f_from().display);
+    pinfo.cols.dst:set(f_to().display);
+    if f_to().value == 0xffffffff then
+        pinfo.cols.dst:append(' (broadcast)');
+    end
+
+    return pos
+end
+DissectorTable.get("loratap.syncword"):add(0x2b, proto_meshtastic);
+
+
+function call_protobuf(msg_name, tvb, pinfo, treeitem)
+    pinfo.private["pb_msg_type"] = "message," .. msg_name;
+    pcall(Dissector.call, protobuf_dissector, tvb, pinfo, treeitem);
+end
+
+
+function proto_meshtastic_payload.dissector(tvb, pinfo, treeitem)
+    local portnum = f_proto_meshtastic_Data_portnum().value;
+    pinfo.cols.info:set("[" .. string.match(f_proto_meshtastic_Data_portnum().display, "[a-zA-Z0-9_]*") .. "]");
+
+    if portnum == 1 then
+        treeitem:add(proto_meshtastic_payload.fields.text, tvb());
+        pinfo.cols.info:set("Text message: \"" .. tvb():string(ENC_UTF_8) .. "\"");
+    elseif portnum == 4 then
+        call_protobuf("meshtastic.User", tvb, pinfo, treeitem);
+        pinfo.cols.info:clear();
+        pinfo.cols.info:set(f_from().display .. " is \"" .. f_proto_meshtastic_User_long_name().value .. "\"");
+    elseif portnum == 2 then
+        call_protobuf("meshtastic.HardwareMessage", tvb, pinfo, treeitem);
+    elseif portnum == 3 then
+        call_protobuf("meshtastic.Position", tvb, pinfo, treeitem);
+    elseif portnum == 5 then
+        call_protobuf("meshtastic.Routing", tvb, pinfo, treeitem);
+    elseif portnum == 6 then
+        call_protobuf("meshtastic.AdminMessage", tvb, pinfo, treeitem);
+    elseif portnum == 7 then
+        treeitem:add("(unishox2 compressed data)");
+    elseif portnum == 8 then
+        call_protobuf("meshtastic.Waypoint", tvb, pinfo, treeitem);
+    elseif portnum == 9 then
+        treeitem:set_text("(codec2 audio frames)");
+    elseif portnum == 10 then
+        treeitem:add(proto_meshtastic_payload.fields.text, tvb());
+    elseif portnum == 32 then
+        treeitem:add(proto_meshtastic_payload.fields.text, tvb());
+    elseif portnum == 33 then
+        -- TODO: Untested. IP traffic tunneled over mesh using https://github.com/meshtastic/python/.
+        pcall(Dissector.call, ip_dissector, tvb, pinfo, treeitem);
+    elseif portnum == 34 then
+        call_protobuf("meshtastic.Paxcount", tvb, pinfo, treeitem);
+    elseif portnum == 64 then
+        treeitem:set_text("(binary data)");
+    elseif portnum == 65 then
+        call_protobuf("meshtastic.StoreAndForward", tvb, pinfo, treeitem);
+    elseif portnum == 66 then
+        treeitem:add(proto_meshtastic_payload.fields.text, tvb());
+    elseif portnum == 67 then
+        call_protobuf("meshtastic.Telemetry", tvb, pinfo, treeitem);
+    elseif portnum == 68 then
+        treeitem:set_text("(https://github.com/a-f-G-U-C/Meshtastic-ZPS?tab=readme-ov-file#message-format-details)");
+    elseif portnum == 69 then
+        -- Simulator use. Not sure what's in it but seems unlikely to actually be broadcast.
+    elseif portnum == 70 then
+        call_protobuf("meshtastic.RouteDiscovery", tvb, pinfo, treeitem);
+    elseif portnum == 71 then
+        call_protobuf("meshtastic.NeighborInfo", tvb, pinfo, treeitem);
+    elseif portnum == 72 then
+        call_protobuf("meshtastic.TAKPacket", tvb, pinfo, treeitem);
+    elseif portnum == 73 then
+        call_protobuf("meshtastic.MapReport", tvb, pinfo, treeitem);
+    elseif portnum == 257 then
+        treeitem:set_text("(https://github.com/paulmandal/libcotshrink)");
+    elseif portnum >= 256 then
+        treeitem:set_text("(PRIVATE_APP data)");
+    end
+end
+DissectorTable.get("protobuf_field"):add("meshtastic.Data.payload", proto_meshtastic_payload.dissector);
