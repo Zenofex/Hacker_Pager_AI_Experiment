@@ -23,10 +23,11 @@ set_plugin_info(info);
 local ciphermode = require("meshtastic.aeslua.ciphermode");
 local protobuf_dissector = Dissector.get("protobuf");
 local ip_dissector = Dissector.get("ip");
+local names_table = {};
 
 local function get_crypto_key(key_base64_str)
     local default_psk = {
-        0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59, 
+        0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59,
         0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01
     };
 
@@ -126,6 +127,22 @@ proto_meshtastic_payload.fields._dontuse2 = ProtoField.string("pbf.meshtastic.Us
 local f_proto_meshtastic_User_long_name = Field.new("pbf.meshtastic.User.long_name");
 
 
+-- Protocol to hold a sub-dissector that relabels packets with source/destination node names
+-- collected from NODEINFO messages.
+local proto_post_names = Proto.new("meshtastic_names", "meshtastic_names");
+function proto_post_names.dissector(tvb, pinfo, treeitem)
+    local src_name = names_table[tostring(pinfo.cols.src)];
+    if src_name ~= nil then
+        pinfo.cols.src:append(" (" .. src_name .. ")");
+    end
+    local dst_name = names_table[tostring(pinfo.cols.dst)];
+    if dst_name ~= nil then
+        pinfo.cols.dst:append(" (" .. dst_name .. ")");
+    end
+end
+register_postdissector(proto_post_names);
+
+
 function proto_meshtastic.dissector(tvb, pinfo, treeitem)
     local subtree = treeitem:add(proto_meshtastic, tvb());
     local pos = 0;
@@ -157,6 +174,14 @@ function proto_meshtastic.dissector(tvb, pinfo, treeitem)
 
     subtree:add(p.fields.relay_node, tvb(pos, 1));
     pos = pos + 1;
+
+    -- Update columns with tree field values.
+    pinfo.cols.protocol:set('Meshtastic');
+    pinfo.cols.src:set(f_from().display);
+    pinfo.cols.dst:set(f_to().display);
+    if f_to().value == 0xffffffff then
+        pinfo.cols.dst:append(' (broadcast)');
+    end
 
     local payload_tvb = tvb(pos);
     local payload_tree = subtree:add(p.fields.payload, payload_tvb);
@@ -193,13 +218,6 @@ function proto_meshtastic.dissector(tvb, pinfo, treeitem)
         pinfo.cols.info:set("Malformed meshtastic.Data protobuf");
     end
 
-    -- Update columns with tree field values.
-    pinfo.cols.protocol:set('Meshtastic');
-    pinfo.cols.src:set(f_from().display);
-    pinfo.cols.dst:set(f_to().display);
-    if f_to().value == 0xffffffff then
-        pinfo.cols.dst:append(' (broadcast)');
-    end
 
     return pos
 end
@@ -223,6 +241,8 @@ function proto_meshtastic_payload.dissector(tvb, pinfo, treeitem)
         call_protobuf("meshtastic.User", tvb, pinfo, treeitem);
         pinfo.cols.info:clear();
         pinfo.cols.info:set(f_from().display .. " is \"" .. f_proto_meshtastic_User_long_name().value .. "\"");
+        names_table[tostring(pinfo.cols.src)] = f_proto_meshtastic_User_long_name().value;
+        print("set " .. tostring(pinfo.cols.src) .. " as " .. f_proto_meshtastic_User_long_name().value);
     elseif portnum == 2 then
         call_protobuf("meshtastic.HardwareMessage", tvb, pinfo, treeitem);
     elseif portnum == 3 then
@@ -273,3 +293,4 @@ function proto_meshtastic_payload.dissector(tvb, pinfo, treeitem)
     end
 end
 DissectorTable.get("protobuf_field"):add("meshtastic.Data.payload", proto_meshtastic_payload.dissector);
+
