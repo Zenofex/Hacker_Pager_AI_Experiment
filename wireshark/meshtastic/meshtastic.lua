@@ -24,8 +24,11 @@ local ciphermode = require("meshtastic.aeslua.ciphermode");
 local protobuf_dissector = Dissector.get("protobuf");
 local ip_dissector = Dissector.get("ip");
 local names_table = {};
+local packets_table = {};
+
 
 local function get_crypto_key(key_base64_str)
+    -- From /meshtastic/firmware/src/mesh/Channels.cpp
     local default_psk = {
         0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59,
         0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01
@@ -63,7 +66,7 @@ local function get_crypto_iv(packet_id_range, from_range)
 end
 
 
--- Protocol for the outer packet. Invoked when the LoRa syncword is 0x2b.
+-- Protocol for the outer packet. Invoked when the syncword in the LoRaTap header is 0x2b.
 local proto_meshtastic = Proto.new("meshtastic", "Meshtastic");
 proto_meshtastic.prefs.crypto_key = Pref.string("Primary channel encryption key (base64)", "AQ==");
 local p = proto_meshtastic;
@@ -110,6 +113,7 @@ p.fields.portnum = ProtoField.int32("meshtastic.payload.portnum", "Portnum", bas
     [257]="ATAK_FORWARDER",
 });
 p.experts.malformed = ProtoExpert.new("meshtastic.malformed", "Invalid meshtastic.Data proto", expert.group.MALFORMED, expert.severity.ERROR);
+p.experts.duplicate = ProtoExpert.new("meshtastic.duplicate", "Duplicate of an earlier packet", expert.group.PROTOCOL, expert.severity.CHAT);
 -- Reuse this status field from eth so that built-in packet coloring rules for status will apply:
 p.fields.status = ProtoField.uint8("eth.fcs.status", "Status");
 
@@ -143,21 +147,46 @@ end
 register_postdissector(proto_post_names);
 
 
+function proto_meshtastic.init()
+    names_table = {};
+    packets_table = {};
+end
+
+
 function proto_meshtastic.dissector(tvb, pinfo, treeitem)
+    pinfo.cols.protocol:set('Meshtastic');
+
     local subtree = treeitem:add(proto_meshtastic, tvb());
     local pos = 0;
 
+    -- To
     subtree:add_le(p.fields.to, tvb(pos, 4));
     pos = pos + 4;
+    pinfo.cols.dst:set(f_to().display);
+    if f_to().value == 0xffffffff then
+        pinfo.cols.dst:append(' (broadcast)');
+    end
 
+    -- From
     local from_range = tvb(pos, 4);
     subtree:add_le(p.fields.from, from_range);
     pos = pos + 4;
+    pinfo.cols.src:set(f_from().display);
 
+    -- Packet ID
     local packet_id_range = tvb(pos, 4);
     subtree:add_le(p.fields.id, packet_id_range);
+    local idstr = packet_id_range:bytes():tohex();
+    if packets_table[idstr] == nil then
+        packets_table[idstr] = pinfo.number;
+    else
+        -- A packet with the same ID was found in a different frame.
+        local is_dup = packets_table[idstr] ~= pinfo.number;
+        if is_dup then subtree:add_proto_expert_info(p.experts.duplicate) end;
+    end
     pos = pos + 4;
 
+    -- Header fields (hops, ack, mqtt)
     local flag_byte = tvb(pos, 1);
     pos = pos + 1;
     local flags = subtree:add(p.fields.flags, flag_byte)
@@ -166,48 +195,45 @@ function proto_meshtastic.dissector(tvb, pinfo, treeitem)
     flags:add(p.fields.want_ack, flag_byte);
     flags:add(p.fields.via_mqtt, flag_byte);
 
+    -- Channel hash
     subtree:add(p.fields.channel, tvb(pos, 1));
     pos = pos + 1;
 
+    -- (Unused) next hop
     subtree:add(p.fields.next_hop, tvb(pos, 1));
     pos = pos + 1;
 
+    -- (Unused) relay node
     subtree:add(p.fields.relay_node, tvb(pos, 1));
     pos = pos + 1;
 
-    -- Update columns with tree field values.
-    pinfo.cols.protocol:set('Meshtastic');
-    pinfo.cols.src:set(f_from().display);
-    pinfo.cols.dst:set(f_to().display);
-    if f_to().value == 0xffffffff then
-        pinfo.cols.dst:append(' (broadcast)');
-    end
-
+    -- Encrypted payload bytes
     local payload_tvb = tvb(pos);
     local payload_tree = subtree:add(p.fields.payload, payload_tvb);
     payload_tree:set_text("Payload: " .. payload_tvb:len() .. " bytes");
     
-    local data_bytearray = tvb(pos):bytes();
-    local data_size = data_bytearray:len();
-    data_bytearray:set_size(256);
-    local data = data_bytearray:raw();
-    
+    -- Decrypted payload (meshtastic.Data protobuf)
     local protobuf_tree;
     local protobuf_tvb;
+    local data_bytearray = tvb(pos):bytes();
+    local data_size = data_bytearray:len();
+    data_bytearray:set_size(256);  -- Zero-pad before decrypting.
     local key = get_crypto_key(proto_meshtastic.prefs.crypto_key);
     if #key > 0 then
         local iv = get_crypto_iv(packet_id_range, from_range);
-        local decrypted = string.sub(ciphermode.decryptString(key, data, ciphermode.decryptCTR, iv), 1, data_size);
+        local decrypted = string.sub(ciphermode.decryptString(key, data_bytearray:raw(), ciphermode.decryptCTR, iv), 1, data_size);
         protobuf_tvb = ByteArray.new(decrypted, true):tvb("Decrypted payload");
         protobuf_tree = payload_tree:add(p.fields.payload_decrypted, protobuf_tvb());
     else
-        -- Skip decryption.
+        -- Channel doesn't have a decryption key, skip decryption.
         protobuf_tvb = payload_tvb;
         protobuf_tree = payload_tree;
     end
     pinfo.private["pb_msg_type"] = "message,meshtastic.Data";
+    -- Call protobuf dissector, including proto_meshtastic_payload on the "payload" bytes field of the protobuf.
     pcall(Dissector.call, protobuf_dissector, protobuf_tvb, pinfo, protobuf_tree);
 
+    -- Portnum (field decoded by proto_meshtastic_payload)
     local portnum = f_proto_meshtastic_Data_portnum();
     if portnum ~= nil then
         subtree:add(p.fields.portnum, portnum.value);
@@ -217,7 +243,6 @@ function proto_meshtastic.dissector(tvb, pinfo, treeitem)
         protobuf_tree:add(p.fields.status, 0):set_hidden(true);
         pinfo.cols.info:set("Malformed meshtastic.Data protobuf");
     end
-
 
     return pos
 end
@@ -242,7 +267,6 @@ function proto_meshtastic_payload.dissector(tvb, pinfo, treeitem)
         pinfo.cols.info:clear();
         pinfo.cols.info:set(f_from().display .. " is \"" .. f_proto_meshtastic_User_long_name().value .. "\"");
         names_table[tostring(pinfo.cols.src)] = f_proto_meshtastic_User_long_name().value;
-        print("set " .. tostring(pinfo.cols.src) .. " as " .. f_proto_meshtastic_User_long_name().value);
     elseif portnum == 2 then
         call_protobuf("meshtastic.HardwareMessage", tvb, pinfo, treeitem);
     elseif portnum == 3 then
