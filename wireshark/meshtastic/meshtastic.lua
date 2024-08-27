@@ -113,7 +113,7 @@ p.fields.portnum = ProtoField.int32("meshtastic.payload.portnum", "Portnum", bas
     [257]="ATAK_FORWARDER",
 });
 p.experts.malformed = ProtoExpert.new("meshtastic.malformed", "Invalid meshtastic.Data proto", expert.group.MALFORMED, expert.severity.ERROR);
-p.experts.duplicate = ProtoExpert.new("meshtastic.duplicate", "Duplicate of an earlier packet", expert.group.PROTOCOL, expert.severity.CHAT);
+p.experts.duplicate = ProtoExpert.new("meshtastic.duplicate", "Duplicate of an earlier packet", expert.group.PROTOCOL, expert.severity.NOTE);
 -- Reuse this status field from eth so that built-in packet coloring rules for status will apply:
 p.fields.status = ProtoField.uint8("eth.fcs.status", "Status");
 
