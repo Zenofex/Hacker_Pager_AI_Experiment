@@ -125,6 +125,7 @@ class NimbleBluetoothServerCallback : public NimBLEServerCallbacks
         passkeyShowing = true;
 
         #ifdef EXPLOITEERS_PAGER
+        // EXPLOITEERS_PAGER doesn't use the Meshtastic screen.
         pagerModule->handleBluetoothPin(passkey);
         #endif
 

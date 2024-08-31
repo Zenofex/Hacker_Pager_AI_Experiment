@@ -12,7 +12,7 @@
 class SX1262Interface : public SX126xInterface<SX1262>
 {
 #ifdef EXPLOITEERS_PAGER
-    // Pager would like some very low-level radio access...
+    // For accessing the radio, bypassing Meshtastic.
     friend class pager::PacketCapture;
 #endif
 

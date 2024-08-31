@@ -215,6 +215,8 @@ typedef enum _meshtastic_HardwareModel {
     /* WisMesh Tap
  RAK-4631 w/ TFT in injection modled case */
     meshtastic_HardwareModel_WISMESH_TAP = 84,
+    /* exploitee.rs Hacker Pager. Retro-styled pager with Meshtastic messaging and LoRa utilities. ESP32-S3, SX1262. */
+    meshtastic_HardwareModel_EXPLOITEERS_PAGER = 85,
     /* ------------------------------------------------------------------------------------------------------------------------------------------
  Reserved ID For developing private Ports. These will show up in live traffic sparsely, so we can use a high number. Keep it within 8 bits.
  ------------------------------------------------------------------------------------------------------------------------------------------ */
