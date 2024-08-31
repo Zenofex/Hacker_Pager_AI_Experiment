@@ -361,6 +361,7 @@ void RadioLibInterface::handleReceiveInterrupt()
     int state = iface->readData(radiobuf, length);
 
     #ifdef EXPLOITEERS_PAGER
+    // EXPLOITEERS_PAGER has raw packet logging functionality with .pcap export.
     if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_ERR_CRC_MISMATCH) {
         pagerModule->handleRawPacket(radiobuf, length, false);
     }

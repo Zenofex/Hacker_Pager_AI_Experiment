@@ -106,8 +106,9 @@
 #elif defined(HELTEC_V3)
 #define HW_VENDOR meshtastic_HardwareModel_HELTEC_V3
 #if defined(EXPLOITEERS_PAGER)
+// EXPLOITEERS_PAGER is based on HELTEC_V3, with added hardware.
 #undef HW_VENDOR
-#define HW_VENDOR meshtastic_HardwareModel_PRIVATE_HW  // TODO
+#define HW_VENDOR meshtastic_HardwareModel_EXPLOITEERS_PAGER
 #endif
 #elif defined(HELTEC_WSL_V3)
 #define HW_VENDOR meshtastic_HardwareModel_HELTEC_WSL_V3

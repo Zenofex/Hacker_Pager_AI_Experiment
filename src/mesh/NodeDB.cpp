@@ -282,6 +282,7 @@ void NodeDB::installDefaultConfig()
     config.bluetooth.mode = hasScreen ? meshtastic_Config_BluetoothConfig_PairingMode_RANDOM_PIN
                                       : meshtastic_Config_BluetoothConfig_PairingMode_FIXED_PIN;
 #ifdef EXPLOITEERS_PAGER
+    // EXPLOITEERS_PAGER doesn't use the standard Meshtastic screen, but can still show a PIN.
     config.bluetooth.mode = meshtastic_Config_BluetoothConfig_PairingMode_RANDOM_PIN;
 #endif
 

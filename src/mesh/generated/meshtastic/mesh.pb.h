@@ -165,6 +165,10 @@ typedef enum _meshtastic_HardwareModel {
     meshtastic_HardwareModel_RADIOMASTER_900_BANDIT_NANO = 64,
     /* Heltec Capsule Sensor V3 with ESP32-S3 CPU, Portable LoRa device that can replace GNSS modules or sensors */
     meshtastic_HardwareModel_HELTEC_CAPSULE_SENSOR_V3 = 65,
+    /* *
+ EXPLOITEERS_PAGER
+ exploitee.rs Hacker Pager. Retro-styled pager with Meshtastic messaging and LoRa utilities. ESP32-S3, SX1262. */
+    meshtastic_HardwareModel_EXPLOITEERS_PAGER = 66,
     /* ------------------------------------------------------------------------------------------------------------------------------------------
  Reserved ID For developing private Ports. These will show up in live traffic sparsely, so we can use a high number. Keep it within 8 bits.
  ------------------------------------------------------------------------------------------------------------------------------------------ */
