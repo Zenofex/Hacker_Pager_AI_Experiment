@@ -523,8 +523,7 @@ bool Power::setup()
     bool found = axpChipInit() || analogInit();
 
     #if defined(BQ27441_POWER_GAUGE)
-    static BQ27441PowerGauge bq27441;
-    batteryLevel = &bq27441;  // Assign to HasBatteryLevel*
+    BQ27441PowerGauge* bq27441 = new BQ27441PowerGauge();  // Assign to HasBatteryLevel*
     found = true; // Indicate we found a battery gauge
     #endif
 
