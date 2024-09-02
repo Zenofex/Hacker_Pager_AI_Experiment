@@ -573,8 +573,10 @@ bool Power::setup()
 #endif
 
     #if defined(BQ27441_POWER_GAUGE)
-    BQ27441PowerGauge* bq27441 = new BQ27441PowerGauge();  // Assign to HasBatteryLevel*
+    BQ27441PowerGauge* bq27441 = new BQ27441PowerGauge();  // Create the BQ27441 object dynamically
+    batteryLevel = bq27441;  // Assign to the batteryLevel member
     found = true; // Indicate we found a battery gauge
+    LOG_INFO("BQ27441 power gauge assigned successfully.\n");
     #endif
 
     enabled = found;
