@@ -106,6 +106,12 @@ class Power : private concurrency::OSThread
     void setStatusHandler(meshtastic::PowerStatus *handler) { statusHandler = handler; }
     const uint16_t OCV[11] = {OCV_ARRAY};
 
+    #ifdef BQ27441_POWER_GAUGE
+    HasBatteryLevel* getBatteryLevel() const {
+        return batteryLevel;
+    }
+    #endif
+
   protected:
     meshtastic::PowerStatus *statusHandler;
 
@@ -119,6 +125,9 @@ class Power : private concurrency::OSThread
   private:
     // open circuit voltage lookup table
     uint8_t low_voltage_counter;
+    #ifdef BQ27441_POWER_GAUGE
+    HasBatteryLevel* batteryLevel;
+    #endif
 #ifdef DEBUG_HEAP
     uint32_t lastheap;
 #endif
