@@ -34,6 +34,10 @@
 
 #endif
 
+#if defined(BQ27441_POWER_GAUGE)
+#include "modules/exploiteers_pager/bq27441_power_gauge.h"
+#endif
+
 #ifndef DELAY_FOREVER
 #define DELAY_FOREVER portMAX_DELAY
 #endif
@@ -92,31 +96,6 @@ RAK9154Sensor rak9154Sensor;
 
 #ifdef HAS_PMU
 XPowersLibInterface *PMU = NULL;
-#else
-
-// Copy of the base class defined in axp20x.h.
-// I'd rather not include axp20x.h as it brings Wire dependency.
-class HasBatteryLevel
-{
-  public:
-    /**
-     * Battery state of charge, from 0 to 100 or -1 for unknown
-     */
-    virtual int getBatteryPercent() { return -1; }
-
-    /**
-     * The raw voltage of the battery or NAN if unknown
-     */
-    virtual uint16_t getBattVoltage() { return 0; }
-
-    /**
-     * return true if there is a battery installed in this unit
-     */
-    virtual bool isBatteryConnect() { return false; }
-
-    virtual bool isVbusIn() { return false; }
-    virtual bool isCharging() { return false; }
-};
 #endif
 
 bool pmu_irq = false;
@@ -592,6 +571,12 @@ bool Power::setup()
 #ifdef NRF_APM
     found = true;
 #endif
+
+    #if defined(BQ27441_POWER_GAUGE)
+    static BQ27441PowerGauge bq27441;
+    batteryLevel = &bq27441;  // Assign to HasBatteryLevel*
+    found = true; // Indicate we found a battery gauge
+    #endif
 
     enabled = found;
     low_voltage_counter = 0;
