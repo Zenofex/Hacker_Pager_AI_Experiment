@@ -495,7 +495,13 @@ bool RadioLibInterface::startSend(meshtastic_MeshPacket *txp)
 
         size_t numbytes = beginSending(txp);
 
+        #ifdef EXPLOITEERS_PAGER
+        // EXPLOITEERS_PAGER has raw packet logging functionality with .pcap export.
+        pagerModule->handleRawPacket((uint8_t *)&radioBuffer, numbytes, true);
+        #endif
+
         int res = iface->startTransmit((uint8_t *)&radioBuffer, numbytes);
+
         if (res != RADIOLIB_ERR_NONE) {
             LOG_ERROR("startTransmit failed, error=%d", res);
             RECORD_CRITICALERROR(meshtastic_CriticalErrorCode_RADIO_SPI_BUG);
