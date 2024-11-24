@@ -87,10 +87,7 @@
 #endif
 #if !MESHTASTIC_EXCLUDE_DROPZONE
 #include "modules/DropzoneModule.h"
-#ifdef EXPLOITEERS_PAGER
-#include "modules/exploiteers_pager/PagerModule.h"
 #endif
-
 #ifdef EXPLOITEERS_PAGER
 #include "modules/exploiteers_pager/PagerModule.h"
 #endif
@@ -239,10 +236,6 @@ void setupModules()
         pagerModule = new PagerModule();
         pagerModule->init();
 #endif
-#endif
-#ifdef EXPLOITEERS_PAGER
-        pagerModule = new PagerModule();
-        pagerModule->init();
 #endif
     } else {
 #if !MESHTASTIC_EXCLUDE_ADMIN

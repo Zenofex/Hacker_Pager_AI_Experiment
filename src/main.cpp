@@ -119,6 +119,7 @@ AudioThread *audioThread = nullptr;
 
 #if defined(TCXO_OPTIONAL)
 float tcxoVoltage = SX126X_DIO3_TCXO_VOLTAGE; // if TCXO is optional, put this here so it can be changed further down.
+#endif
 
 using namespace concurrency;
 
@@ -986,9 +987,6 @@ void setup()
         } else {
             LOG_INFO("SX1262 init success, XTAL, Vref %f V", tcxoVoltage);
             radioType = SX1262_RADIO;
-#ifdef EXPLOITEERS_PAGER
-            pagerModule->setRadio(static_cast<SX1262Interface*>(rIf));
-#endif
         }
     }
 #endif
