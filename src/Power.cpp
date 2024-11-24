@@ -38,6 +38,10 @@
 #include "modules/exploiteers_pager/bq27441_power_gauge.h"
 #endif
 
+#if defined(BQ27441_POWER_GAUGE)
+#include "modules/exploiteers_pager/bq27441_power_gauge.h"
+#endif
+
 #ifndef DELAY_FOREVER
 #define DELAY_FOREVER portMAX_DELAY
 #endif
@@ -571,6 +575,13 @@ bool Power::setup()
 #ifdef NRF_APM
     found = true;
 #endif
+
+    #if defined(BQ27441_POWER_GAUGE)
+    BQ27441PowerGauge* bq27441 = new BQ27441PowerGauge();  // Create the BQ27441 object dynamically
+    batteryLevel = bq27441;  // Assign to the batteryLevel member
+    found = true; // Indicate we found a battery gauge
+    LOG_INFO("BQ27441 power gauge assigned successfully.\n");
+    #endif
 
     #if defined(BQ27441_POWER_GAUGE)
     BQ27441PowerGauge* bq27441 = new BQ27441PowerGauge();  // Create the BQ27441 object dynamically

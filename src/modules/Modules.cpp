@@ -91,6 +91,10 @@
 #include "modules/exploiteers_pager/PagerModule.h"
 #endif
 
+#ifdef EXPLOITEERS_PAGER
+#include "modules/exploiteers_pager/PagerModule.h"
+#endif
+
 /**
  * Create module instances here.  If you are adding a new module, you must 'new' it here (or somewhere else)
  */
@@ -230,6 +234,10 @@ void setupModules()
 #endif
 #if !MESHTASTIC_EXCLUDE_RANGETEST && !MESHTASTIC_EXCLUDE_GPS
         new RangeTestModule();
+#endif
+#ifdef EXPLOITEERS_PAGER
+        pagerModule = new PagerModule();
+        pagerModule->init();
 #endif
 #endif
 #ifdef EXPLOITEERS_PAGER

@@ -509,8 +509,8 @@ void NodeDB::installDefaultConfig(bool preserveKey = false)
     // EXPLOITEERS_PAGER doesn't use the standard Meshtastic screen, but can still show a PIN.
     config.bluetooth.mode = meshtastic_Config_BluetoothConfig_PairingMode_RANDOM_PIN;
 #endif
-#endif
 
+#endif
     // for backward compat, default position flags are ALT+MSL
     config.position.position_flags =
         (meshtastic_Config_PositionConfig_PositionFlags_ALTITUDE | meshtastic_Config_PositionConfig_PositionFlags_ALTITUDE_MSL |

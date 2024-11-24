@@ -953,6 +953,9 @@ void setup()
         } else {
             LOG_INFO("SX1262 init success");
             radioType = SX1262_RADIO;
+#ifdef EXPLOITEERS_PAGER
+            pagerModule->setRadio(static_cast<SX1262Interface*>(rIf));
+#endif
         }
     }
 #endif
