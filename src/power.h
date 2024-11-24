@@ -65,7 +65,6 @@ extern RAK9154Sensor rak9154Sensor;
 #include "XPowersLibInterface.hpp"
 extern XPowersLibInterface *PMU;
 #else
-
 // Copy of the base class defined in axp20x.h.
 // I'd rather not include axp20x.h as it brings Wire dependency.
 class HasBatteryLevel

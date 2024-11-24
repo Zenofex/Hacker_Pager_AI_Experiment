@@ -55,7 +55,7 @@ typedef struct {
     PacketHeader header;
 
     /** The payload, of maximum length minus the header, aligned just to be sure */
-    uint8_t payload[MAX_LORA_PAYLOAD_LEN + 1 - sizeof(PacketHeader)] __attribute__((__aligned__));
+    uint8_t payload[MAX_LORA_PAYLOAD_LEN + 1 - sizeof(PacketHeader)];// __attribute__((__aligned__));
 
 } RadioBuffer;
 

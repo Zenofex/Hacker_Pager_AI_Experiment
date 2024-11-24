@@ -371,7 +371,7 @@ void RadioLibInterface::completeSending()
 void RadioLibInterface::handleReceiveInterrupt()
 {
     uint32_t xmitMsec;
-
+    LOG_ERROR("handleReceiveInterrupt()\n");
     // when this is called, we should be in receive mode - if we are not, just jump out instead of bombing. Possible Race
     // Condition?
     if (!isReceiving) {
@@ -404,7 +404,10 @@ void RadioLibInterface::handleReceiveInterrupt()
     #ifdef EXPLOITEERS_PAGER
     // EXPLOITEERS_PAGER has raw packet logging functionality with .pcap export.
     if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_ERR_CRC_MISMATCH) {
+        LOG_ERROR("pagerModule->handleRawPacket()\n");
         pagerModule->handleRawPacket((uint8_t *)&radioBuffer, length, false);
+    } else {
+        LOG_ERROR("Not logging packet: state=%d\n", state);
     }
     #endif
 

@@ -96,31 +96,6 @@ RAK9154Sensor rak9154Sensor;
 
 #ifdef HAS_PMU
 XPowersLibInterface *PMU = NULL;
-#else
-
-// Copy of the base class defined in axp20x.h.
-// I'd rather not include axp20x.h as it brings Wire dependency.
-class HasBatteryLevel
-{
-  public:
-    /**
-     * Battery state of charge, from 0 to 100 or -1 for unknown
-     */
-    virtual int getBatteryPercent() { return -1; }
-
-    /**
-     * The raw voltage of the battery or NAN if unknown
-     */
-    virtual uint16_t getBattVoltage() { return 0; }
-
-    /**
-     * return true if there is a battery installed in this unit
-     */
-    virtual bool isBatteryConnect() { return false; }
-
-    virtual bool isVbusIn() { return false; }
-    virtual bool isCharging() { return false; }
-};
 #endif
 
 bool pmu_irq = false;
