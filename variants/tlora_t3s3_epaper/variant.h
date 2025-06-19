@@ -2,7 +2,6 @@
 #define SDCARD_USE_SPI1
 
 // Display (E-Ink)
-#define USE_EINK
 #define PIN_EINK_CS 15
 #define PIN_EINK_BUSY 48
 #define PIN_EINK_DC 16
@@ -19,6 +18,7 @@
 #define I2C_SCL SCL
 
 // external qwiic connector
+#define GPS_DEFAULT_NOT_PRESENT 1
 #define GPS_RX_PIN 44
 #define GPS_TX_PIN 43
 

@@ -7,7 +7,9 @@
 #include "input/SerialKeyboardImpl.h"
 #include "input/TrackballInterruptImpl1.h"
 #include "input/UpDownInterruptImpl1.h"
+#if !MESHTASTIC_EXCLUDE_I2C
 #include "input/cardKbI2cImpl.h"
+#endif
 #include "input/kbMatrixImpl.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_ADMIN
@@ -47,6 +49,7 @@
 #endif
 #if ARCH_PORTDUINO
 #include "input/LinuxInputImpl.h"
+#include "modules/Telemetry/HostMetrics.h"
 #if !MESHTASTIC_EXCLUDE_STOREFORWARD
 #include "modules/StoreForwardModule.h"
 #endif
@@ -63,6 +66,10 @@
 #if HAS_TELEMETRY && !MESHTASTIC_EXCLUDE_POWER_TELEMETRY
 #include "modules/Telemetry/PowerTelemetry.h"
 #endif
+#if !MESHTASTIC_EXCLUDE_GENERIC_THREAD_MODULE
+#include "modules/GenericThreadModule.h"
+#endif
+
 #ifdef ARCH_ESP32
 #if defined(USE_SX1280) && !MESHTASTIC_EXCLUDE_AUDIO
 #include "modules/esp32/AudioModule.h"
@@ -74,7 +81,7 @@
 #include "modules/StoreForwardModule.h"
 #endif
 #endif
-#if defined(ARCH_ESP32) || defined(ARCH_NRF52) || defined(ARCH_RP2040)
+#if defined(ARCH_ESP32) || defined(ARCH_NRF52) || defined(ARCH_RP2040) || defined(ARCH_PORTDUINO)
 #if !MESHTASTIC_EXCLUDE_EXTERNALNOTIFICATION
 #include "modules/ExternalNotificationModule.h"
 #endif
@@ -132,6 +139,9 @@ void setupModules()
 #if !MESHTASTIC_EXCLUDE_DROPZONE
         dropzoneModule = new DropzoneModule();
 #endif
+#if !MESHTASTIC_EXCLUDE_GENERIC_THREAD_MODULE
+        new GenericThreadModule();
+#endif
         // Note: if the rest of meshtastic doesn't need to explicitly use your module, you do not need to assign the instance
         // to a global variable.
 
@@ -175,7 +185,7 @@ void setupModules()
         aSerialKeyboardImpl->init();
 #endif // INPUTBROKER_MATRIX_TYPE
 #endif // HAS_BUTTON
-#if ARCH_PORTDUINO
+#if ARCH_PORTDUINO && !HAS_TFT
         aLinuxInputImpl = new LinuxInputImpl();
         aLinuxInputImpl->init();
 #endif
@@ -189,6 +199,9 @@ void setupModules()
 #if HAS_SCREEN && !MESHTASTIC_EXCLUDE_CANNEDMESSAGES
         cannedMessageModule = new CannedMessageModule();
 #endif
+#if ARCH_PORTDUINO
+        new HostMetricsModule();
+#endif
 #if HAS_TELEMETRY
         new DeviceTelemetryModule();
 #endif
@@ -197,10 +210,12 @@ void setupModules()
         if (nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_PMSA003I].first > 0) {
             new AirQualityTelemetryModule();
         }
+#if !MESHTASTIC_EXCLUDE_HEALTH_TELEMETRY
         if (nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_MAX30102].first > 0 ||
             nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_MLX90614].first > 0) {
             new HealthTelemetryModule();
         }
+#endif
 #endif
 #if HAS_TELEMETRY && !MESHTASTIC_EXCLUDE_POWER_TELEMETRY && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
         new PowerTelemetryModule();
@@ -225,7 +240,7 @@ void setupModules()
         storeForwardModule = new StoreForwardModule();
 #endif
 #endif
-#if defined(ARCH_ESP32) || defined(ARCH_NRF52) || defined(ARCH_RP2040)
+#if defined(ARCH_ESP32) || defined(ARCH_NRF52) || defined(ARCH_RP2040) || defined(ARCH_PORTDUINO)
 #if !MESHTASTIC_EXCLUDE_EXTERNALNOTIFICATION
         externalNotificationModule = new ExternalNotificationModule();
 #endif

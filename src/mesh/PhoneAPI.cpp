@@ -12,6 +12,8 @@
 #include "PhoneAPI.h"
 #include "PowerFSM.h"
 #include "RadioInterface.h"
+#include "Router.h"
+#include "SPILock.h"
 #include "TypeConversions.h"
 #include "main.h"
 #include "xmodem.h"
@@ -52,9 +54,17 @@ void PhoneAPI::handleStartConfig()
     }
 
     // even if we were already connected - restart our state machine
-    state = STATE_SEND_MY_INFO;
+    if (config_nonce == SPECIAL_NONCE_ONLY_NODES) {
+        // If client only wants node info, jump directly to sending nodes
+        state = STATE_SEND_OWN_NODEINFO;
+        LOG_INFO("Client only wants node info, skipping other config");
+    } else {
+        state = STATE_SEND_MY_INFO;
+    }
     pauseBluetoothLogging = true;
+    spiLock->lock();
     filesManifest = getFiles("/", 10);
+    spiLock->unlock();
     LOG_DEBUG("Got %d files in manifest", filesManifest.size());
 
     LOG_INFO("Start API client config");
@@ -164,6 +174,7 @@ bool PhoneAPI::handleToRadio(const uint8_t *buf, size_t bufLength)
  *
  * Our sending states progress in the following sequence (the client apps ASSUME THIS SEQUENCE, DO NOT CHANGE IT):
     STATE_SEND_MY_INFO, // send our my info record
+    STATE_SEND_UIDATA,
     STATE_SEND_OWN_NODEINFO,
     STATE_SEND_METADATA,
     STATE_SEND_CHANNELS
@@ -188,7 +199,6 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
     case STATE_SEND_NOTHING:
         LOG_DEBUG("FromRadio=STATE_SEND_NOTHING");
         break;
-
     case STATE_SEND_MY_INFO:
         LOG_DEBUG("FromRadio=STATE_SEND_MY_INFO");
         // If the user has specified they don't want our node to share its location, make sure to tell the phone
@@ -196,9 +206,16 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
         fromRadioScratch.which_payload_variant = meshtastic_FromRadio_my_info_tag;
         strncpy(myNodeInfo.pio_env, optstr(APP_ENV), sizeof(myNodeInfo.pio_env));
         fromRadioScratch.my_info = myNodeInfo;
-        state = STATE_SEND_OWN_NODEINFO;
+        state = STATE_SEND_UIDATA;
 
         service->refreshLocalMeshNode(); // Update my NodeInfo because the client will be asking for it soon.
+        break;
+
+    case STATE_SEND_UIDATA:
+        LOG_INFO("getFromRadio=STATE_SEND_UIDATA");
+        fromRadioScratch.which_payload_variant = meshtastic_FromRadio_deviceuiConfig_tag;
+        fromRadioScratch.deviceuiConfig = uiconfig;
+        state = STATE_SEND_OWN_NODEINFO;
         break;
 
     case STATE_SEND_OWN_NODEINFO: {
@@ -213,7 +230,12 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
             // Should allow us to resume sending NodeInfo in STATE_SEND_OTHER_NODEINFOS
             nodeInfoForPhone.num = 0;
         }
-        state = STATE_SEND_METADATA;
+        if (config_nonce == SPECIAL_NONCE_ONLY_NODES) {
+            // If client only wants node info, jump directly to sending nodes
+            state = STATE_SEND_OTHER_NODEINFOS;
+        } else {
+            state = STATE_SEND_METADATA;
+        }
         break;
     }
 
@@ -283,6 +305,9 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
         case meshtastic_Config_sessionkey_tag:
             LOG_DEBUG("Send config: sessionkey");
             fromRadioScratch.config.which_payload_variant = meshtastic_Config_sessionkey_tag;
+            break;
+        case meshtastic_Config_device_ui_tag: // NOOP!
+            fromRadioScratch.config.which_payload_variant = meshtastic_Config_device_ui_tag;
             break;
         default:
             LOG_ERROR("Unknown config type %d", config_state);
@@ -374,8 +399,14 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
         config_state++;
         // Advance when we have sent all of our ModuleConfig objects
         if (config_state > (_meshtastic_AdminMessage_ModuleConfigType_MAX + 1)) {
-            // Clients sending special nonce don't want to see other nodeinfos
-            state = config_nonce == SPECIAL_NONCE ? STATE_SEND_FILEMANIFEST : STATE_SEND_OTHER_NODEINFOS;
+            // Handle special nonce behaviors:
+            // - SPECIAL_NONCE_ONLY_CONFIG: Skip node info, go directly to file manifest
+            // - SPECIAL_NONCE_ONLY_NODES: After sending nodes, skip to complete
+            if (config_nonce == SPECIAL_NONCE_ONLY_CONFIG) {
+                state = STATE_SEND_FILEMANIFEST;
+            } else {
+                state = STATE_SEND_OTHER_NODEINFOS;
+            }
             config_state = 0;
         }
         break;
@@ -401,7 +432,8 @@ size_t PhoneAPI::getFromRadio(uint8_t *buf)
     case STATE_SEND_FILEMANIFEST: {
         LOG_DEBUG("FromRadio=STATE_SEND_FILEMANIFEST");
         // last element
-        if (config_state == filesManifest.size()) { // also handles an empty filesManifest
+        if (config_state == filesManifest.size() ||
+            config_nonce == SPECIAL_NONCE_ONLY_NODES) { // also handles an empty filesManifest
             config_state = 0;
             filesManifest.clear();
             // Skip to complete packet
@@ -518,6 +550,7 @@ bool PhoneAPI::available()
     case STATE_SEND_NOTHING:
         return false;
     case STATE_SEND_MY_INFO:
+    case STATE_SEND_UIDATA:
     case STATE_SEND_CHANNELS:
     case STATE_SEND_CONFIG:
     case STATE_SEND_MODULECONFIG:
@@ -532,9 +565,12 @@ bool PhoneAPI::available()
             auto nextNode = nodeDB->readNextMeshNode(readIndex);
             if (nextNode) {
                 nodeInfoForPhone = TypeConversions::ConvertToNodeInfo(nextNode);
-                nodeInfoForPhone.hops_away = nodeInfoForPhone.num == nodeDB->getNodeNum() ? 0 : nodeInfoForPhone.hops_away;
-                nodeInfoForPhone.is_favorite =
-                    nodeInfoForPhone.is_favorite || nodeInfoForPhone.num == nodeDB->getNodeNum(); // Our node is always a favorite
+                bool isUs = nodeInfoForPhone.num == nodeDB->getNodeNum();
+                nodeInfoForPhone.hops_away = isUs ? 0 : nodeInfoForPhone.hops_away;
+                nodeInfoForPhone.last_heard = isUs ? getValidTime(RTCQualityFromNet) : nodeInfoForPhone.last_heard;
+                nodeInfoForPhone.snr = isUs ? 0 : nodeInfoForPhone.snr;
+                nodeInfoForPhone.via_mqtt = isUs ? false : nodeInfoForPhone.via_mqtt;
+                nodeInfoForPhone.is_favorite = nodeInfoForPhone.is_favorite || isUs; // Our node is always a favorite
             }
         }
         return true; // Always say we have something, because we might need to advance our state machine
@@ -613,13 +649,14 @@ bool PhoneAPI::handleToRadioPacket(meshtastic_MeshPacket &p)
 {
     printPacket("PACKET FROM PHONE", &p);
 
-// For use with the simulator, we should not ignore duplicate packets
-#if !(defined(ARCH_PORTDUINO) && !HAS_RADIO)
-    if (p.id > 0 && wasSeenRecently(p.id)) {
-        LOG_DEBUG("Ignore packet from phone, already seen recently");
-        return false;
-    }
+#if defined(ARCH_PORTDUINO)
+    // For use with the simulator, we should not ignore duplicate packets from the phone
+    if (SimRadio::instance == nullptr)
 #endif
+        if (p.id > 0 && wasSeenRecently(p.id)) {
+            LOG_DEBUG("Ignore packet from phone, already seen recently");
+            return false;
+        }
 
     if (p.decoded.portnum == meshtastic_PortNum_TRACEROUTE_APP && lastPortNumToRadio[p.decoded.portnum] &&
         Throttle::isWithinTimespanMs(lastPortNumToRadio[p.decoded.portnum], THIRTY_SECONDS_MS)) {
@@ -628,8 +665,15 @@ bool PhoneAPI::handleToRadioPacket(meshtastic_MeshPacket &p)
         meshtastic_QueueStatus qs = router->getQueueStatus();
         service->sendQueueStatusToPhone(qs, 0, p.id);
         return false;
-    } else if (p.decoded.portnum == meshtastic_PortNum_POSITION_APP && lastPortNumToRadio[p.decoded.portnum] &&
-               Throttle::isWithinTimespanMs(lastPortNumToRadio[p.decoded.portnum], FIVE_SECONDS_MS)) {
+    } else if (p.decoded.portnum == meshtastic_PortNum_TRACEROUTE_APP && isBroadcast(p.to) && p.hop_limit > 0) {
+        sendNotification(meshtastic_LogRecord_Level_WARNING, p.id, "Multi-hop traceroute to broadcast address is not allowed");
+        meshtastic_QueueStatus qs = router->getQueueStatus();
+        service->sendQueueStatusToPhone(qs, 0, p.id);
+        return false;
+    } else if (IS_ONE_OF(meshtastic_PortNum_POSITION_APP, meshtastic_PortNum_WAYPOINT_APP, meshtastic_PortNum_ALERT_APP) &&
+               lastPortNumToRadio[p.decoded.portnum] &&
+               Throttle::isWithinTimespanMs(lastPortNumToRadio[p.decoded.portnum], TEN_SECONDS_MS)) {
+        // TODO: [Issue #6700] Make this rate limit throttling scale up / down with the preset
         LOG_WARN("Rate limit portnum %d", p.decoded.portnum);
         meshtastic_QueueStatus qs = router->getQueueStatus();
         service->sendQueueStatusToPhone(qs, 0, p.id);

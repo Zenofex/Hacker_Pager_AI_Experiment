@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 #include "Screen.h"
-#include "../userPrefs.h"
 #include "PowerMon.h"
 #include "Throttle.h"
 #include "configuration.h"
@@ -31,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #if !MESHTASTIC_EXCLUDE_GPS
 #include "GPS.h"
 #endif
+#include "ButtonThread.h"
 #include "MeshService.h"
 #include "NodeDB.h"
 #include "error.h"
@@ -124,10 +124,10 @@ static bool heartbeat = false;
 
 #define getStringCenteredX(s) ((SCREEN_WIDTH - display->getStringWidth(s)) / 2)
 
-/// Check if the display can render a string (detect special chars; emoji)
+// Check if the display can render a string (detect special chars; emoji)
 static bool haveGlyphs(const char *str)
 {
-#if defined(OLED_PL) || defined(OLED_UA) || defined(OLED_RU)
+#if defined(OLED_PL) || defined(OLED_UA) || defined(OLED_RU) || defined(OLED_CS)
     // Don't want to make any assumptions about custom language support
     return true;
 #endif
@@ -163,11 +163,7 @@ static void drawIconScreen(const char *upperMsg, OLEDDisplay *display, OLEDDispl
 
     display->setFont(FONT_MEDIUM);
     display->setTextAlignment(TEXT_ALIGN_LEFT);
-#ifdef USERPREFS_SPLASH_TITLE
-    const char *title = USERPREFS_SPLASH_TITLE;
-#else
     const char *title = "meshtastic.org";
-#endif
     display->drawString(x + getStringCenteredX(title), y + SCREEN_HEIGHT - FONT_HEIGHT_MEDIUM, title);
     display->setFont(FONT_SMALL);
 
@@ -185,6 +181,56 @@ static void drawIconScreen(const char *upperMsg, OLEDDisplay *display, OLEDDispl
 
     display->setTextAlignment(TEXT_ALIGN_LEFT); // Restore left align, just to be kind to any other unsuspecting code
 }
+
+#ifdef USERPREFS_OEM_TEXT
+
+static void drawOEMIconScreen(const char *upperMsg, OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
+{
+    static const uint8_t xbm[] = USERPREFS_OEM_IMAGE_DATA;
+    display->drawXbm(x + (SCREEN_WIDTH - USERPREFS_OEM_IMAGE_WIDTH) / 2,
+                     y + (SCREEN_HEIGHT - FONT_HEIGHT_MEDIUM - USERPREFS_OEM_IMAGE_HEIGHT) / 2 + 2, USERPREFS_OEM_IMAGE_WIDTH,
+                     USERPREFS_OEM_IMAGE_HEIGHT, xbm);
+
+    switch (USERPREFS_OEM_FONT_SIZE) {
+    case 0:
+        display->setFont(FONT_SMALL);
+        break;
+    case 2:
+        display->setFont(FONT_LARGE);
+        break;
+    default:
+        display->setFont(FONT_MEDIUM);
+        break;
+    }
+
+    display->setTextAlignment(TEXT_ALIGN_LEFT);
+    const char *title = USERPREFS_OEM_TEXT;
+    display->drawString(x + getStringCenteredX(title), y + SCREEN_HEIGHT - FONT_HEIGHT_MEDIUM, title);
+    display->setFont(FONT_SMALL);
+
+    // Draw region in upper left
+    if (upperMsg)
+        display->drawString(x + 0, y + 0, upperMsg);
+
+    // Draw version and shortname in upper right
+    char buf[25];
+    snprintf(buf, sizeof(buf), "%s\n%s", xstr(APP_VERSION_SHORT), haveGlyphs(owner.short_name) ? owner.short_name : "");
+
+    display->setTextAlignment(TEXT_ALIGN_RIGHT);
+    display->drawString(x + SCREEN_WIDTH, y + 0, buf);
+    screen->forceDisplay();
+
+    display->setTextAlignment(TEXT_ALIGN_LEFT); // Restore left align, just to be kind to any other unsuspecting code
+}
+
+static void drawOEMBootScreen(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
+{
+    // Draw region in upper left
+    const char *region = myRegion ? myRegion->name : NULL;
+    drawOEMIconScreen(region, display, state, x, y);
+}
+
+#endif
 
 void Screen::drawFrameText(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y, const char *message)
 {
@@ -1016,7 +1062,7 @@ static void drawTextMessageFrame(OLEDDisplay *display, OLEDDisplayUiState *state
                          y + (SCREEN_HEIGHT - FONT_HEIGHT_MEDIUM - devil_height) / 2 + 2 + 5, devil_width, devil_height, devil);
     } else if (strcmp(msg, "♥️") == 0 || strcmp(msg, "\U0001F9E1") == 0 || strcmp(msg, "\U00002763") == 0 ||
                strcmp(msg, "\U00002764") == 0 || strcmp(msg, "\U0001F495") == 0 || strcmp(msg, "\U0001F496") == 0 ||
-               strcmp(msg, "\U0001F497") == 0 || strcmp(msg, "\U0001F496") == 0) {
+               strcmp(msg, "\U0001F497") == 0 || strcmp(msg, "\U0001F498") == 0) {
         display->drawXbm(x + (SCREEN_WIDTH - heart_width) / 2,
                          y + (SCREEN_HEIGHT - FONT_HEIGHT_MEDIUM - heart_height) / 2 + 2 + 5, heart_width, heart_height, heart);
     } else {
@@ -1058,7 +1104,7 @@ static void drawNodes(OLEDDisplay *display, int16_t x, int16_t y, const NodeStat
     char usersString[20];
     snprintf(usersString, sizeof(usersString), "%d/%d", nodeStatus->getNumOnline(), nodeStatus->getNumTotal());
 #if (defined(USE_EINK) || defined(ILI9341_DRIVER) || defined(ILI9342_DRIVER) || defined(ST7701_CS) || defined(ST7735_CS) ||      \
-     defined(ST7789_CS) || defined(USE_ST7789) || defined(HX8357_CS)) &&                                                         \
+     defined(ST7789_CS) || defined(USE_ST7789) || defined(ILI9488_CS) || defined(HX8357_CS)) &&                                  \
     !defined(DISPLAY_FORCE_SMALL_FONTS)
     display->drawFastImage(x, y + 3, 8, 8, imgUser);
 #else
@@ -1401,9 +1447,9 @@ static void drawNodeInfo(OLEDDisplay *display, OLEDDisplayUiState *state, int16_
 
     static char distStr[20];
     if (config.display.units == meshtastic_Config_DisplayConfig_DisplayUnits_IMPERIAL) {
-        strncpy(distStr, "? mi", sizeof(distStr)); // might not have location data
+        strncpy(distStr, "? mi ?°", sizeof(distStr)); // might not have location data
     } else {
-        strncpy(distStr, "? km", sizeof(distStr));
+        strncpy(distStr, "? km ?°", sizeof(distStr));
     }
     meshtastic_NodeInfoLite *ourNode = nodeDB->getMeshNode(nodeDB->getNodeNum());
     const char *fields[] = {username, lastStr, signalStr, distStr, NULL};
@@ -1420,7 +1466,7 @@ static void drawNodeInfo(OLEDDisplay *display, OLEDDisplayUiState *state, int16_
     }
     bool hasNodeHeading = false;
 
-    if (ourNode && (hasValidPosition(ourNode) || screen->hasHeading())) {
+    if (ourNode && (nodeDB->hasValidPosition(ourNode) || screen->hasHeading())) {
         const meshtastic_PositionLite &op = ourNode->position;
         float myHeading;
         if (screen->hasHeading())
@@ -1429,24 +1475,12 @@ static void drawNodeInfo(OLEDDisplay *display, OLEDDisplayUiState *state, int16_
             myHeading = screen->estimatedHeading(DegD(op.latitude_i), DegD(op.longitude_i));
         screen->drawCompassNorth(display, compassX, compassY, myHeading);
 
-        if (hasValidPosition(node)) {
+        if (nodeDB->hasValidPosition(node)) {
             // display direction toward node
             hasNodeHeading = true;
             const meshtastic_PositionLite &p = node->position;
             float d =
                 GeoCoord::latLongToMeter(DegD(p.latitude_i), DegD(p.longitude_i), DegD(op.latitude_i), DegD(op.longitude_i));
-
-            if (config.display.units == meshtastic_Config_DisplayConfig_DisplayUnits_IMPERIAL) {
-                if (d < (2 * MILES_TO_FEET))
-                    snprintf(distStr, sizeof(distStr), "%.0f ft", d * METERS_TO_FEET);
-                else
-                    snprintf(distStr, sizeof(distStr), "%.1f mi", d * METERS_TO_FEET / MILES_TO_FEET);
-            } else {
-                if (d < 2000)
-                    snprintf(distStr, sizeof(distStr), "%.0f m", d);
-                else
-                    snprintf(distStr, sizeof(distStr), "%.1f km", d / 1000);
-            }
 
             float bearingToOther =
                 GeoCoord::bearing(DegD(op.latitude_i), DegD(op.longitude_i), DegD(p.latitude_i), DegD(p.longitude_i));
@@ -1455,6 +1489,22 @@ static void drawNodeInfo(OLEDDisplay *display, OLEDDisplayUiState *state, int16_
             if (!config.display.compass_north_top)
                 bearingToOther -= myHeading;
             screen->drawNodeHeading(display, compassX, compassY, compassDiam, bearingToOther);
+
+            float bearingToOtherDegrees = (bearingToOther < 0) ? bearingToOther + 2 * PI : bearingToOther;
+            bearingToOtherDegrees = bearingToOtherDegrees * 180 / PI;
+
+            if (config.display.units == meshtastic_Config_DisplayConfig_DisplayUnits_IMPERIAL) {
+                if (d < (2 * MILES_TO_FEET))
+                    snprintf(distStr, sizeof(distStr), "%.0fft   %.0f°", d * METERS_TO_FEET, bearingToOtherDegrees);
+                else
+                    snprintf(distStr, sizeof(distStr), "%.1fmi   %.0f°", d * METERS_TO_FEET / MILES_TO_FEET,
+                             bearingToOtherDegrees);
+            } else {
+                if (d < 2000)
+                    snprintf(distStr, sizeof(distStr), "%.0fm   %.0f°", d, bearingToOtherDegrees);
+                else
+                    snprintf(distStr, sizeof(distStr), "%.1fkm   %.0f°", d / 1000, bearingToOtherDegrees);
+            }
         }
     }
     if (!hasNodeHeading) {
@@ -1495,7 +1545,7 @@ Screen::Screen(ScanI2C::DeviceAddress address, meshtastic_Config_DisplayConfig_O
     dispdev = new SSD1306Wire(address.address, -1, -1, geometry,
                               (address.port == ScanI2C::I2CPort::WIRE1) ? HW_I2C::I2C_TWO : HW_I2C::I2C_ONE);
 #elif defined(ST7735_CS) || defined(ILI9341_DRIVER) || defined(ILI9342_DRIVER) || defined(ST7701_CS) || defined(ST7789_CS) ||    \
-    defined(RAK14014) || defined(HX8357_CS)
+    defined(RAK14014) || defined(HX8357_CS) || defined(ILI9488_CS)
     dispdev = new TFTDisplay(address.address, -1, -1, geometry,
                              (address.port == ScanI2C::I2CPort::WIRE1) ? HW_I2C::I2C_TWO : HW_I2C::I2C_ONE);
 #elif defined(USE_EINK) && !defined(USE_EINK_DYNAMICDISPLAY)
@@ -1507,7 +1557,7 @@ Screen::Screen(ScanI2C::DeviceAddress address, meshtastic_Config_DisplayConfig_O
 #elif defined(USE_ST7567)
     dispdev = new ST7567Wire(address.address, -1, -1, geometry,
                              (address.port == ScanI2C::I2CPort::WIRE1) ? HW_I2C::I2C_TWO : HW_I2C::I2C_ONE);
-#elif ARCH_PORTDUINO
+#elif ARCH_PORTDUINO && !HAS_TFT
     if (settingsMap[displayPanel] != no_screen) {
         LOG_DEBUG("Make TFTDisplay!");
         dispdev = new TFTDisplay(address.address, -1, -1, geometry,
@@ -1557,9 +1607,13 @@ void Screen::handleSetOn(bool on, FrameCallback einkScreensaver)
     if (on != screenOn) {
         if (on) {
             LOG_INFO("Turn on screen");
+            buttonThread->setScreenFlag(true);
             powerMon->setState(meshtastic_PowerMon_State_Screen_On);
 #ifdef T_WATCH_S3
             PMU->enablePowerOutput(XPOWERS_ALDO2);
+#endif
+#ifdef HELTEC_TRACKER_V1_X
+            uint8_t tft_vext_enabled = digitalRead(VEXT_ENABLE);
 #endif
 #if !ARCH_PORTDUINO
             dispdev->displayOn();
@@ -1571,6 +1625,12 @@ void Screen::handleSetOn(bool on, FrameCallback einkScreensaver)
 #endif
 
             dispdev->displayOn();
+#ifdef HELTEC_TRACKER_V1_X
+            // If the TFT VEXT power is not enabled, initialize the UI.
+            if (!tft_vext_enabled) {
+                ui->init();
+            }
+#endif
 #ifdef USE_ST7789
             pinMode(VTFT_CTRL, OUTPUT);
             digitalWrite(VTFT_CTRL, LOW);
@@ -1592,6 +1652,12 @@ void Screen::handleSetOn(bool on, FrameCallback einkScreensaver)
             setScreensaverFrames(einkScreensaver);
 #endif
             LOG_INFO("Turn off screen");
+            buttonThread->setScreenFlag(false);
+#ifdef ELECROW_ThinkNode_M1
+            if (digitalRead(PIN_EINK_EN) == HIGH) {
+                digitalWrite(PIN_EINK_EN, LOW);
+            }
+#endif
             dispdev->displayOff();
 #ifdef USE_ST7789
             SPI1.end();
@@ -1659,6 +1725,10 @@ void Screen::setup()
     // Set the utf8 conversion function
     dispdev->setFontTableLookupFunction(customFontTableLookup);
 
+#ifdef USERPREFS_OEM_TEXT
+    logo_timeout *= 2; // Double the time if we have a custom logo
+#endif
+
     // Add frames.
     EINK_ADD_FRAMEFLAG(dispdev, DEMAND_FAST);
     alertFrames[0] = [this](OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y) -> void {
@@ -1690,7 +1760,7 @@ void Screen::setup()
     // flip it. If you have a headache now, you're welcome.
     if (!config.display.flip_screen) {
 #if defined(ST7701_CS) || defined(ST7735_CS) || defined(ILI9341_DRIVER) || defined(ILI9342_DRIVER) || defined(ST7701_CS) ||      \
-    defined(ST7789_CS) || defined(RAK14014) || defined(HX8357_CS)
+    defined(ST7789_CS) || defined(RAK14014) || defined(HX8357_CS) || defined(ILI9488_CS)
         static_cast<TFTDisplay *>(dispdev)->flipScreenVertically();
 #elif defined(USE_ST7789)
         static_cast<ST7789Spi *>(dispdev)->flipScreenVertically();
@@ -1719,7 +1789,7 @@ void Screen::setup()
 #endif
     serialSinceMsec = millis();
 
-#if ARCH_PORTDUINO
+#if ARCH_PORTDUINO && !HAS_TFT
     if (settingsMap[touchscreenModule]) {
         touchScreenImpl1 =
             new TouchScreenImpl1(dispdev->getWidth(), dispdev->getHeight(), static_cast<TFTDisplay *>(dispdev)->getTouch);
@@ -1735,7 +1805,9 @@ void Screen::setup()
     powerStatusObserver.observe(&powerStatus->onNewStatus);
     gpsStatusObserver.observe(&gpsStatus->onNewStatus);
     nodeStatusObserver.observe(&nodeStatus->onNewStatus);
+#if !MESHTASTIC_EXCLUDE_ADMIN
     adminMessageObserver.observe(adminModule);
+#endif
     if (textMessageModule)
         textMessageObserver.observe(textMessageModule);
     if (inputBroker)
@@ -1803,6 +1875,22 @@ int32_t Screen::runOnce()
         stopBootScreen();
         showingBootScreen = false;
     }
+
+#ifdef USERPREFS_OEM_TEXT
+    static bool showingOEMBootScreen = true;
+    if (showingOEMBootScreen && (millis() > ((logo_timeout / 2) + serialSinceMsec))) {
+        LOG_INFO("Switch to OEM screen...");
+        // Change frames.
+        static FrameCallback bootOEMFrames[] = {drawOEMBootScreen};
+        static const int bootOEMFrameCount = sizeof(bootOEMFrames) / sizeof(bootOEMFrames[0]);
+        ui->setFrames(bootOEMFrames, bootOEMFrameCount);
+        ui->update();
+#ifndef USE_EINK
+        ui->update();
+#endif
+        showingOEMBootScreen = false;
+    }
+#endif
 
 #ifndef DISABLE_WELCOME_UNSET
     if (showingNormalScreen && config.lora.region == meshtastic_Config_LoRaConfig_RegionCode_UNSET) {
@@ -2413,7 +2501,7 @@ void DebugInfo::drawFrame(OLEDDisplay *display, OLEDDisplayUiState *state, int16
         if (!Throttle::isWithinTimespanMs(storeForwardModule->lastHeartbeat,
                                           (storeForwardModule->heartbeatInterval * 1200))) { // no heartbeat, overlap a bit
 #if (defined(USE_EINK) || defined(ILI9341_DRIVER) || defined(ILI9342_DRIVER) || defined(ST7701_CS) || defined(ST7735_CS) ||      \
-     defined(ST7789_CS) || defined(USE_ST7789) || defined(HX8357_CS) || ARCH_PORTDUINO) &&                                       \
+     defined(ST7789_CS) || defined(USE_ST7789) || defined(HX8357_CS) || defined(ILI9488_CS) || ARCH_PORTDUINO) &&                \
     !defined(DISPLAY_FORCE_SMALL_FONTS)
             display->drawFastImage(x + SCREEN_WIDTH - 14 - display->getStringWidth(ourId), y + 3 + FONT_HEIGHT_SMALL, 12, 8,
                                    imgQuestionL1);
@@ -2425,7 +2513,7 @@ void DebugInfo::drawFrame(OLEDDisplay *display, OLEDDisplayUiState *state, int16
 #endif
         } else {
 #if (defined(USE_EINK) || defined(ILI9341_DRIVER) || defined(ILI9342_DRIVER) || defined(ST7701_CS) || defined(ST7735_CS) ||      \
-     defined(ST7789_CS) || defined(USE_ST7789) || defined(HX8357_CS)) &&                                                         \
+     defined(ST7789_CS) || defined(USE_ST7789) || defined(ILI9488_CS) || defined(HX8357_CS)) &&                                  \
     !defined(DISPLAY_FORCE_SMALL_FONTS)
             display->drawFastImage(x + SCREEN_WIDTH - 18 - display->getStringWidth(ourId), y + 3 + FONT_HEIGHT_SMALL, 16, 8,
                                    imgSFL1);
@@ -2440,7 +2528,7 @@ void DebugInfo::drawFrame(OLEDDisplay *display, OLEDDisplayUiState *state, int16
     } else {
         // TODO: Raspberry Pi supports more than just the one screen size
 #if (defined(USE_EINK) || defined(ILI9341_DRIVER) || defined(ILI9342_DRIVER) || defined(ST7701_CS) || defined(ST7735_CS) ||      \
-     defined(ST7789_CS) || defined(USE_ST7789) || defined(HX8357_CS) || ARCH_PORTDUINO) &&                                       \
+     defined(ST7789_CS) || defined(USE_ST7789) || defined(HX8357_CS) || defined(ILI9488_CS) || ARCH_PORTDUINO) &&                \
     !defined(DISPLAY_FORCE_SMALL_FONTS)
         display->drawFastImage(x + SCREEN_WIDTH - 14 - display->getStringWidth(ourId), y + 3 + FONT_HEIGHT_SMALL, 12, 8,
                                imgInfoL1);
@@ -2579,13 +2667,12 @@ void DebugInfo::drawFrameSettings(OLEDDisplay *display, OLEDDisplayUiState *stat
             display->drawString(x + 1, y, String("USB"));
     }
 
-    auto mode = DisplayFormatters::getModemPresetDisplayName(config.lora.modem_preset, true);
+    //    auto mode = DisplayFormatters::getModemPresetDisplayName(config.lora.modem_preset, true);
 
-    display->drawString(x + SCREEN_WIDTH - display->getStringWidth(mode), y, mode);
-    if (config.display.heading_bold)
-        display->drawString(x + SCREEN_WIDTH - display->getStringWidth(mode) - 1, y, mode);
+    //    display->drawString(x + SCREEN_WIDTH - display->getStringWidth(mode), y, mode);
+    //    if (config.display.heading_bold)
+    //        display->drawString(x + SCREEN_WIDTH - display->getStringWidth(mode) - 1, y, mode);
 
-    // Line 2
     uint32_t currentMillis = millis();
     uint32_t seconds = currentMillis / 1000;
     uint32_t minutes = seconds / 60;
@@ -2596,10 +2683,18 @@ void DebugInfo::drawFrameSettings(OLEDDisplay *display, OLEDDisplayUiState *stat
     // minutes %= 60;
     // hours %= 24;
 
-    display->setColor(WHITE);
-
     // Show uptime as days, hours, minutes OR seconds
     std::string uptime = screen->drawTimeDelta(days, hours, minutes, seconds);
+
+    // Line 1 (Still)
+    display->drawString(x + SCREEN_WIDTH - display->getStringWidth(uptime.c_str()), y, uptime.c_str());
+    if (config.display.heading_bold)
+        display->drawString(x - 1 + SCREEN_WIDTH - display->getStringWidth(uptime.c_str()), y, uptime.c_str());
+
+    display->setColor(WHITE);
+
+    // Setup string to assemble analogClock string
+    std::string analogClock = "";
 
     uint32_t rtc_sec = getValidTime(RTCQuality::RTCQualityDevice, true); // Display local timezone
     if (rtc_sec > 0) {
@@ -2614,17 +2709,33 @@ void DebugInfo::drawFrameSettings(OLEDDisplay *display, OLEDDisplayUiState *stat
         int min = (hms % SEC_PER_HOUR) / SEC_PER_MIN;
         int sec = (hms % SEC_PER_HOUR) % SEC_PER_MIN; // or hms % SEC_PER_MIN
 
-        char timebuf[10];
-        snprintf(timebuf, sizeof(timebuf), " %02d:%02d:%02d", hour, min, sec);
-        uptime += timebuf;
+        char timebuf[12];
+
+        if (config.display.use_12h_clock) {
+            std::string meridiem = "am";
+            if (hour >= 12) {
+                if (hour > 12)
+                    hour -= 12;
+                meridiem = "pm";
+            }
+            if (hour == 00) {
+                hour = 12;
+            }
+            snprintf(timebuf, sizeof(timebuf), "%d:%02d:%02d%s", hour, min, sec, meridiem.c_str());
+        } else {
+            snprintf(timebuf, sizeof(timebuf), "%02d:%02d:%02d", hour, min, sec);
+        }
+        analogClock += timebuf;
     }
 
-    display->drawString(x, y + FONT_HEIGHT_SMALL * 1, uptime.c_str());
+    // Line 2
+    display->drawString(x, y + FONT_HEIGHT_SMALL * 1, analogClock.c_str());
 
     // Display Channel Utilization
     char chUtil[13];
     snprintf(chUtil, sizeof(chUtil), "ChUtil %2.0f%%", airTime->channelUtilizationPercent());
     display->drawString(x + SCREEN_WIDTH - display->getStringWidth(chUtil), y + FONT_HEIGHT_SMALL * 1, chUtil);
+
 #if HAS_GPS
     if (config.position.gps_mode == meshtastic_Config_PositionConfig_GpsMode_ENABLED) {
         // Line 3
@@ -2638,7 +2749,7 @@ void DebugInfo::drawFrameSettings(OLEDDisplay *display, OLEDDisplayUiState *stat
         drawGPSpowerstat(display, x, y + FONT_HEIGHT_SMALL * 2, gpsStatus);
     }
 #endif
-    /* Display a heartbeat pixel that blinks every time the frame is redrawn */
+/* Display a heartbeat pixel that blinks every time the frame is redrawn */
 #ifdef SHOW_REDRAWS
     if (heartbeat)
         display->setPixel(0, 0);
@@ -2738,9 +2849,6 @@ int Screen::handleInputEvent(const InputEvent *event)
 
 int Screen::handleAdminMessage(const meshtastic_AdminMessage *arg)
 {
-    // Note: only selected admin messages notify this observer
-    // If you wish to handle a new type of message, you should modify AdminModule.cpp first
-
     switch (arg->which_payload_variant) {
     // Node removed manually (i.e. via app)
     case meshtastic_AdminMessage_remove_by_nodenum_tag:

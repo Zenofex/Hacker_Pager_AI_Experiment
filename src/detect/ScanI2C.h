@@ -12,14 +12,13 @@ class ScanI2C
         SCREEN_SH1106,
         SCREEN_UNKNOWN, // has the same address as the two above but does not respond to the same commands
         SCREEN_ST7567,
-        ATECC608B,
         RTC_RV3028,
         RTC_PCF8563,
         CARDKB,
         TDECKKB,
         BBQ10KB,
         RAK14004,
-        PMU_AXP192_AXP2101,
+        PMU_AXP192_AXP2101, // has the same adress as the TCA8418KB
         BME_680,
         BME_280,
         BMP_280,
@@ -50,6 +49,7 @@ class ScanI2C
         VEML7700,
         RCWL9620,
         NCP5623,
+        LP5562,
         TSL2591,
         OPT3001,
         MLX90632,
@@ -63,7 +63,15 @@ class ScanI2C
         ICM20948,
         MAX30102,
         TPS65233,
-        MPR121KB
+        MPR121KB,
+        CGRADSENS,
+        INA226,
+        NXP_SE050,
+        DFROBOT_RAIN,
+        DPS310,
+        LTR390UV,
+        TCA8418KB,
+        PCT2075,
     } DeviceType;
 
     // typedef uint8_t DeviceAddress;
@@ -115,6 +123,8 @@ class ScanI2C
     FoundDevice firstKeyboard() const;
 
     FoundDevice firstAccelerometer() const;
+
+    FoundDevice firstRGBLED() const;
 
     virtual FoundDevice find(DeviceType) const;
 

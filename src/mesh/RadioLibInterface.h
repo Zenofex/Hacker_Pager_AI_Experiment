@@ -16,24 +16,20 @@
 
 #define RADIOLIB_PIN_TYPE uint32_t
 
+// In addition to the default Rx flags, we need the PREAMBLE_DETECTED flag to detect whether we are actively receiving
+#define MESHTASTIC_RADIOLIB_IRQ_RX_FLAGS (RADIOLIB_IRQ_RX_DEFAULT_FLAGS | (1 << RADIOLIB_IRQ_PREAMBLE_DETECTED))
+
 /**
  * We need to override the RadioLib ArduinoHal class to add mutex protection for SPI bus access
  */
 class LockingArduinoHal : public ArduinoHal
 {
   public:
-    LockingArduinoHal(SPIClass &spi, SPISettings spiSettings, RADIOLIB_PIN_TYPE _busy = RADIOLIB_NC)
-        : ArduinoHal(spi, spiSettings)
-    {
-#if ARCH_PORTDUINO
-        busy = _busy;
-#endif
-    };
+    LockingArduinoHal(SPIClass &spi, SPISettings spiSettings) : ArduinoHal(spi, spiSettings){};
 
     void spiBeginTransaction() override;
     void spiEndTransaction() override;
 #if ARCH_PORTDUINO
-    RADIOLIB_PIN_TYPE busy;
     void spiTransfer(uint8_t *out, size_t len, uint8_t *in) override;
 
 #endif
@@ -139,18 +135,32 @@ class RadioLibInterface : public RadioInterface, protected concurrency::Notified
      */
     virtual bool isActivelyReceiving() = 0;
 
+    /** Are we are currently sending a packet?
+     * This method is public, intending to expose this information to other firmware components
+     */
+    virtual bool isSending();
+
     /** Attempt to cancel a previously sent packet.  Returns true if a packet was found we could cancel */
     virtual bool cancelSending(NodeNum from, PacketId id) override;
+
+    /** Attempt to find a packet in the TxQueue. Returns true if the packet was found. */
+    virtual bool findInTxQueue(NodeNum from, PacketId id) override;
 
   private:
     /** if we have something waiting to send, start a short (random) timer so we can come check for collision before actually
      * doing the transmit */
     void setTransmitDelay();
 
-    /** random timer with certain min. and max. settings */
+    /**
+     * random timer with certain min. and max. settings
+     * @return Timestamp after which the packet may be sent
+     */
     void startTransmitTimer(bool withDelay = true);
 
-    /** timer scaled to SNR of to be flooded packet */
+    /**
+     * timer scaled to SNR of to be flooded packet
+     * @return Timestamp after which the packet may be sent
+     */
     void startTransmitTimerSNR(float snr);
 
     void handleTransmitInterrupt();
@@ -200,4 +210,9 @@ class RadioLibInterface : public RadioInterface, protected concurrency::Notified
     virtual void setStandby();
 
     const char *radioLibErr = "RadioLib err=";
+
+    /**
+     * If the packet is not already in the late rebroadcast window, move it there
+     */
+    void clampToLateRebroadcastWindow(NodeNum from, PacketId id);
 };

@@ -18,7 +18,8 @@
 #error "meshtastic_ToRadio_size is too large for our BLE packets"
 #endif
 
-#define SPECIAL_NONCE 69420
+#define SPECIAL_NONCE_ONLY_CONFIG 69420
+#define SPECIAL_NONCE_ONLY_NODES 69421 // ( ͡° ͜ʖ ͡°)
 
 /**
  * Provides our protobuf based API which phone/PC clients can use to talk to our device
@@ -34,6 +35,7 @@ class PhoneAPI
 {
     enum State {
         STATE_SEND_NOTHING, // Initial state, don't send anything until the client starts asking for config
+        STATE_SEND_UIDATA,  // send stored data for device-ui
         STATE_SEND_MY_INFO, // send our my info record
         STATE_SEND_OWN_NODEINFO,
         STATE_SEND_METADATA,
@@ -148,6 +150,9 @@ class PhoneAPI
      */
     virtual void onNowHasData(uint32_t fromRadioNum) {}
 
+    /// begin a new connection
+    void handleStartConfig();
+
   private:
     void releasePhonePacket();
 
@@ -156,9 +161,6 @@ class PhoneAPI
     void releaseMqttClientProxyPhonePacket();
 
     void releaseClientNotification();
-
-    /// begin a new connection
-    void handleStartConfig();
 
     bool wasSeenRecently(uint32_t packetId);
 

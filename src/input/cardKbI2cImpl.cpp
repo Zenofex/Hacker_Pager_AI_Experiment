@@ -12,8 +12,8 @@ void CardKbI2cImpl::init()
 #if !MESHTASTIC_EXCLUDE_I2C && !defined(ARCH_PORTDUINO) && !defined(I2C_NO_RESCAN)
     if (cardkb_found.address == 0x00) {
         LOG_DEBUG("Rescan for I2C keyboard");
-        uint8_t i2caddr_scan[] = {CARDKB_ADDR, TDECK_KB_ADDR, BBQ10_KB_ADDR, MPR121_KB_ADDR};
-        uint8_t i2caddr_asize = 4;
+        uint8_t i2caddr_scan[] = {CARDKB_ADDR, TDECK_KB_ADDR, BBQ10_KB_ADDR, MPR121_KB_ADDR, XPOWERS_AXP192_AXP2101_ADDRESS};
+        uint8_t i2caddr_asize = 5;
         auto i2cScanner = std::unique_ptr<ScanI2CTwoWire>(new ScanI2CTwoWire());
 
 #if WIRE_INTERFACES_COUNT == 2
@@ -43,16 +43,21 @@ void CardKbI2cImpl::init()
                 // assign an arbitrary value to distinguish from other models
                 kb_model = 0x37;
                 break;
+            case ScanI2C::DeviceType::TCA8418KB:
+                // assign an arbitrary value to distinguish from other models
+                kb_model = 0x84;
+                break;
             default:
                 // use this as default since it's also just zero
                 LOG_WARN("kb_info.type is unknown(0x%02x), setting kb_model=0x00", kb_info.type);
                 kb_model = 0x00;
             }
         }
-        LOG_DEBUG("Keyboard Type: 0x%02x Model: 0x%02x Address: 0x%02x", kb_info.type, kb_model, cardkb_found.address);
         if (cardkb_found.address == 0x00) {
             disable();
             return;
+        } else {
+            LOG_DEBUG("Keyboard Type: 0x%02x Model: 0x%02x Address: 0x%02x", kb_info.type, kb_model, cardkb_found.address);
         }
     }
 #else
