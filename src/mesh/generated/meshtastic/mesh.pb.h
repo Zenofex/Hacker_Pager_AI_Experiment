@@ -268,7 +268,7 @@ typedef enum _meshtastic_HardwareModel {
  GAT562 Mesh Trial Tracker */
     meshtastic_HardwareModel_GAT562_MESH_TRIAL_TRACKER = 104,
     /* exploitee.rs Hacker Pager. Retro-styled pager with Meshtastic messaging and LoRa utilities. ESP32-S3, SX1262. */
-    meshtastic_HardwareModel_EXPLOITEERS_PAGER = 105,
+    meshtastic_HardwareModel_EXPLOITEERS_PAGER = 251,
     /* ------------------------------------------------------------------------------------------------------------------------------------------
  Reserved ID For developing private Ports. These will show up in live traffic sparsely, so we can use a high number. Keep it within 8 bits.
  ------------------------------------------------------------------------------------------------------------------------------------------ */
