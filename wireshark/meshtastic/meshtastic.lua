@@ -44,15 +44,24 @@ local function get_crypto_key(key_base64_str)
         local key = default_psk;
         key[#key] = key[#key] + (user_key:int() - 1);
         return key;
-    elseif (user_key:len() < 16) then
+    elseif (user_key:len() <= 16) then
         local key = user_key;
         key:set_size(16);
-        return key;
-    elseif (user_key:len() < 32) then
+        local key_table = {}
+        for i = 1, 16 do
+            key_table[i] = key:get_index(i - 1)
+        end
+        return key_table
+    elseif (user_key:len() <= 32) then
         local key = user_key;
         key:set_size(32);
-        return key;
+        local key_table = {}
+        for i = 1, 32 do
+            key_table[i] = key:get_index(i - 1)
+        end
+        return key_table
     end
+    error("Error: Meshtastic channel key (set in Wireshark Preferences) is longer than 32 bytes")
 end
 
 
