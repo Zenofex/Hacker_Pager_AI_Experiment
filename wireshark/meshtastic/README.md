@@ -5,10 +5,13 @@ hackerpager.net
 
 # Installation Instructions
 
+Please make sure to follow all the steps or you will see a lot of errors.
+
 1. Copy the meshtastic/ directory to the plugins/ directory of Wireshark's "personal configuration folder".
   * The location of this folder varies by system: https://www.wireshark.org/docs/wsug_html_chunked/ChAppFilesConfigurationSection.html
   * You may need to create a plugins/ subdirectory in this folder if it doesn't already exist.
   * On Windows, this will look like: C:\Users\YOUR_USERNAME\AppData\Roaming\Wireshark\plugins\meshtastic
+  * On Mac, /Users/YOUR_USERNAME/.config/wireshark/plugins/meshtastic
 
 2. Open Wireshark.
 
@@ -20,7 +23,7 @@ hackerpager.net
 
 6. Click "Edit..." next to "Protobuf search paths".
 
-7. Add the plugins/meshtastic/protobuf/ directory.
+7. Add the plugins/meshtastic/protobufs/ directory.
 
 8. Check "Load all files" next to new entry.
 
