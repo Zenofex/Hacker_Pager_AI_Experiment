@@ -15,7 +15,7 @@
 -- 10. Open .pcap file.
 
 local info = {
-    version = "1.0",
+    version = "1.1",
     author = "exploitee.rs",
 };
 set_plugin_info(info);
@@ -275,6 +275,7 @@ function proto_meshtastic_payload.dissector(tvb, pinfo, treeitem)
         call_protobuf("meshtastic.User", tvb, pinfo, treeitem);
         pinfo.cols.info:clear();
         pinfo.cols.info:set(f_from().display .. " is \"" .. f_proto_meshtastic_User_long_name().value .. "\"");
+        pinfo.cols.info:fence();  -- This doesn't seem to work (Protobuf dissector appends junk), but at least we tried...
         names_table[tostring(pinfo.cols.src)] = f_proto_meshtastic_User_long_name().value;
     elseif portnum == 2 then
         call_protobuf("meshtastic.HardwareMessage", tvb, pinfo, treeitem);
